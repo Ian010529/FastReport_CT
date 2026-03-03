@@ -1,30 +1,30 @@
 # FastReport_CT(v0.1)
 
-面向中国电信客服场景的智能报告生成系统（MVP）。
+An MVP system for generating customer service optimization reports.
 
-系统流程：前端录入客户信息 → 后端落库并调用 LLM → 生成结构化中文分析报告 → 支持列表查询、详情查看与文件下载（TXT/PDF/CSV）。
+Workflow: frontend form input → backend persistence and LLM call → structured Chinese report generation → list, detail view, and file download (TXT/PDF/CSV).
 
-## 1. 项目概览
+## 1. Overview
 
-FastReport_CT 是一个前后端分离项目，聚焦「客户服务优化报告」生成：
+FastReport_CT is a full-stack project focused on generating customer service optimization reports:
 
-- 前端提供报表创建表单与历史记录查询。
-- 后端使用 Spring Boot + JdbcTemplate 对 PostgreSQL 进行读写。
-- 通过 OpenAI 兼容接口生成中文 Markdown 报告。
-- 支持导出报告为 TXT、PDF、CSV。
+- Frontend provides report creation and history search.
+- Backend uses Spring Boot + JdbcTemplate to read/write PostgreSQL.
+- Reports are generated through an OpenAI-compatible API in Markdown format.
+- Export is supported in TXT, PDF, and CSV.
 
-## 2. 技术栈
+## 2. Tech Stack
 
-| 模块 | 技术 |
+| Module | Technology |
 |---|---|
-| 前端 | Next.js 14、React 18、TypeScript、Tailwind CSS |
-| 后端 | Java 17、Spring Boot 3.2.5、Spring Web、JdbcTemplate |
-| 数据库 | PostgreSQL 16 |
-| 文档导出 | iText 8（PDF） |
-| 模型接口 | OpenAI-compatible Chat Completions API |
-| 部署方式 | Docker Compose |
+| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS |
+| Backend | Java 17, Spring Boot 3.2.5, Spring Web, JdbcTemplate |
+| Database | PostgreSQL 16 |
+| Document Export | iText 8 (PDF) |
+| LLM API | OpenAI-compatible Chat Completions API |
+| Deployment | Docker Compose |
 
-## 3. 仓库结构
+## 3. Repository Structure
 
 ```text
 .
@@ -49,61 +49,61 @@ FastReport_CT 是一个前后端分离项目，聚焦「客户服务优化报告
         └── report/[id]/page.tsx
 ```
 
-## 4. 功能说明
+## 4. Features
 
-### 4.1 报告创建
+### 4.1 Report Creation
 
-- 页面：`/`
-- 输入字段：客户信息、套餐、附加服务、近 6 月消费、投诉记录、网络质量。
-- 提交后后端执行同步生成流程：
-  1. 插入记录（`pending`）
-  2. 更新为 `processing`
-  3. 调用 LLM 生成报告
-  4. 成功则 `completed`，失败则 `failed`
+- Page: `/`
+- Input fields: customer profile, plan, additional services, last 6-month spending, complaint history, and network quality.
+- Synchronous backend flow after submit:
+  1. Insert record with `pending`
+  2. Update status to `processing`
+  3. Call LLM to generate report
+  4. Set status to `completed` on success, `failed` on error
 
-### 4.2 报告查询
+### 4.2 Report Query
 
-- 支持历史列表查询与关键字搜索（客户编号/姓名/经理/业务编码等）。
-- 报告详情页：`/report/{id}`。
+- Supports report history and keyword search (customer ID/name, manager, service code, etc.).
+- Detail page: `/report/{id}`.
 
-### 4.3 报告下载
+### 4.3 Report Download
 
-- TXT：纯文本报告。
-- PDF：基于 iText 生成（包含中文字体回退逻辑）。
-- CSV：UTF-8 BOM，便于 Excel 打开。
+- TXT: plain text report
+- PDF: generated with iText (with CJK font fallback logic)
+- CSV: UTF-8 BOM included for better Excel compatibility
 
-## 5. API 一览
+## 5. API Summary
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/reports` | 创建并生成报告（同步） |
-| GET | `/api/reports` | 获取报告列表（支持 `search` 参数） |
-| GET | `/api/reports/{id}` | 获取报告详情 |
-| GET | `/api/reports/{id}/download?format=txt\|pdf\|csv` | 下载报告 |
+| POST | `/api/reports` | Create and generate report (synchronous) |
+| GET | `/api/reports` | List reports (supports `search` query) |
+| GET | `/api/reports/{id}` | Get report detail |
+| GET | `/api/reports/{id}/download?format=txt\|pdf\|csv` | Download report |
 
-### POST /api/reports 请求示例
+### Example Request: POST /api/reports
 
 ```json
 {
   "customerId": "10000001",
-  "customerName": "张三",
+  "customerName": "Zhang San",
   "nationalId": "110101199003077758",
-  "managerName": "李经理",
+  "managerName": "Manager Li",
   "managerId": "200001",
   "serviceCode": "FTTH_500M",
-  "currentPlan": "畅享融合 199 套餐",
-  "additionalServices": ["天翼云盘", "天翼高清"],
+  "currentPlan": "Integrated Plan 199",
+  "additionalServices": ["Cloud Disk", "IPTV"],
   "spendingLast6": [199, 199, 210, 185, 199, 220],
-  "complaintHistory": ["2024-12 宽带网速慢", "2025-01 客服响应时间过长"],
-  "networkQuality": "下载速率偶尔低于签约带宽的 50%"
+  "complaintHistory": ["2024-12 Slow broadband speed", "2025-01 Slow customer service response"],
+  "networkQuality": "Download speed occasionally drops below 50% of subscribed bandwidth"
 }
 ```
 
-## 6. 运行方式（Docker）
+## 6. Run with Docker
 
-### 6.1 准备环境变量
+### 6.1 Prepare Environment Variables
 
-在项目根目录创建 `.env` 文件，至少包含：
+Create a `.env` file in the project root with at least:
 
 ```env
 OPENAI_API_KEY=your_api_key
@@ -111,31 +111,31 @@ OPENAI_BASE_URL=https://api.openai.com
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-### 6.2 启动服务
+### 6.2 Start Services
 
 ```bash
 docker compose up --build
 ```
 
-### 6.3 访问地址
+### 6.3 Access Endpoints
 
-- 前端：http://localhost:3000
-- 后端：http://localhost:8080
-- 数据库：localhost:5432（DB: `fastreport` / user: `fastreport` / pass: `fastreport123`）
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8080
+- Database: localhost:5432 (DB: `fastreport`, user: `fastreport`, password: `fastreport123`)
 
-## 7. 关键配置
+## 7. Key Configuration
 
-- CORS 已允许 `http://localhost:3000`。
-- 前端通过 `NEXT_PUBLIC_API_URL` 指向后端（Compose 中默认 `http://localhost:8080`）。
-- 后端数据库配置可由环境变量覆盖：
+- CORS allows `http://localhost:3000`.
+- Frontend points to backend via `NEXT_PUBLIC_API_URL` (default in Compose: `http://localhost:8080`).
+- Backend datasource can be overridden by:
   - `SPRING_DATASOURCE_URL`
   - `SPRING_DATASOURCE_USERNAME`
   - `SPRING_DATASOURCE_PASSWORD`
 
-## 8. 当前版本说明（v0.1）
+## 8. Version Notes (v0.1)
 
-- 已实现：核心报表生成闭环（创建/查询/详情/下载）。
-- 当前为 MVP：
-  - 暂未实现复杂参数校验与权限体系。
-  - LLM 生成为同步调用，请求耗时受模型响应影响。
-  - 后端逻辑集中在 `ReportController`，后续可进一步分层（Service/Repository）。
+- Implemented: core report lifecycle (create, list/search, detail, download).
+- MVP limitations:
+  - No advanced input validation or authorization model yet.
+  - LLM generation is synchronous and latency depends on model response time.
+  - Backend logic is centralized in `ReportController`; service/repository layering can be added later.
