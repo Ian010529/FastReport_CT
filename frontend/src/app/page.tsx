@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
@@ -46,15 +46,16 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [fetched, setFetched] = useState(false);
-  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchReports();
+  }, []); // 确保只在组件挂载时调用一次
 
   const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [k]: e.target.value });
 
-  async function fetchReports(query?: string) {
-    const q = query !== undefined ? query : search;
-    const url = q ? `${API}/api/reports?search=${encodeURIComponent(q)}` : `${API}/api/reports`;
-    const res = await fetch(url);
+  async function fetchReports() {
+    const res = await fetch(`${API}/api/reports`);
     const data = await res.json();
     setReports(data);
     setFetched(true);
@@ -92,7 +93,7 @@ export default function Home() {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const created = await res.json();
-      alert(`报告 #${created.id} 已生成，状态: ${created.status}`);
+      alert(`报告 #${created.id} 已收到，正在后台生成`);
       await fetchReports();
     } catch (err: unknown) {
       alert("生成失败: " + (err instanceof Error ? err.message : err));
@@ -165,7 +166,7 @@ export default function Home() {
             </button>
             <button
               type="button"
-              onClick={() => fetchReports()}
+              onClick={fetchReports}
               className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-6 py-2 rounded-md"
             >
               🔄 刷新列表
@@ -174,35 +175,9 @@ export default function Home() {
         </form>
       </section>
 
-      {/* ───── Report list with search ───── */}
+      {/* ───── Report list ───── */}
       <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold mb-4">📋 历史报告</h2>
-
-        {/* Search bar */}
-        <div className="flex gap-2 mb-4">
-          <input
-            type="text"
-            placeholder="搜索客户编号、姓名、经理、业务编码…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchReports()}
-            className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => fetchReports()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-md text-sm"
-          >
-            🔍 搜索
-          </button>
-          <button
-            type="button"
-            onClick={() => { setSearch(""); fetchReports(""); }}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-4 py-2 rounded-md text-sm"
-          >
-            清空
-          </button>
-        </div>
         {!fetched ? (
           <p className="text-gray-500 text-sm">点击 "刷新列表" 加载</p>
         ) : reports.length === 0 ? (

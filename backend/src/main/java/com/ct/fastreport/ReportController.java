@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -16,8 +17,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.*;
 
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -35,8 +36,11 @@ public class ReportController {
     private static final Logger log = LoggerFactory.getLogger(ReportController.class);
 
     private final JdbcTemplate db;
+    private final StringRedisTemplate redis;
     private final RestTemplate rest = new RestTemplate();
     private final ObjectMapper mapper = new ObjectMapper();
+
+    private static final String QUEUE_KEY = "report:queue";
 
     @Value("${openai.api-key}")
     private String apiKey;
@@ -47,8 +51,9 @@ public class ReportController {
     @Value("${openai.model}")
     private String model;
 
-    public ReportController(JdbcTemplate db) {
+    public ReportController(JdbcTemplate db, StringRedisTemplate redis) {
         this.db = db;
+        this.redis = redis;
     }
 
     // ────────── DTO (inner classes, keep it flat) ──────────
@@ -86,80 +91,92 @@ public class ReportController {
         public String updatedAt;
     }
 
-    // ────────── POST /api/reports  →  create + generate (sync) ──────────
+    // ────────── POST /api/reports  →  create + enqueue (async) ──────────
 
     @PostMapping
-    public ResponseEntity<ReportResponse> create(@RequestBody ReportRequest req) {
+    public ResponseEntity<Map<String, Object>> create(@RequestBody ReportRequest req) {
         log.info("Creating report for customer {}", req.customerId);
 
         String additionalSvc = req.additionalServices != null ? String.join(",", req.additionalServices) : null;
-        String spending = req.spendingLast6 != null ? req.spendingLast6.toString() : null;
-        String complaints = req.complaintHistory != null ? String.join("||", req.complaintHistory) : null;
+
+        Long customerDbId = upsertCustomer(req);
+        Long managerDbId = upsertManager(req);
 
         // 1. INSERT  status = pending
         KeyHolder keyHolder = new GeneratedKeyHolder();
         db.update(con -> {
             PreparedStatement ps = con.prepareStatement(
-                "INSERT INTO reports (customer_id, customer_name, national_id, manager_name, manager_id, " +
-                "service_code, current_plan, additional_services, spending_last6, complaint_history, " +
-                "network_quality, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                Statement.RETURN_GENERATED_KEYS
+                "INSERT INTO reports (customer_id, manager_id, service_code, current_plan, additional_services, status) " +
+                "VALUES (?,?,?,?,?,?)",
+                new String[]{"id"}
             );
-            ps.setString(1, req.customerId);
-            ps.setString(2, req.customerName);
-            ps.setString(3, req.nationalId);
-            ps.setString(4, req.managerName);
-            ps.setString(5, req.managerId);
-            ps.setString(6, req.serviceCode);
-            ps.setString(7, req.currentPlan);
-            ps.setString(8, additionalSvc);
-            ps.setString(9, spending);
-            ps.setString(10, complaints);
-            ps.setString(11, req.networkQuality);
-            ps.setString(12, "pending");
+            ps.setLong(1, customerDbId);
+            ps.setLong(2, managerDbId);
+            ps.setString(3, req.serviceCode);
+            ps.setString(4, req.currentPlan);
+            ps.setString(5, additionalSvc);
+            ps.setString(6, "pending");
             return ps;
         }, keyHolder);
 
-        long id = ((Number) keyHolder.getKeys().get("id")).longValue();
+        long id = Objects.requireNonNull(keyHolder.getKey(), "insert report id missing").longValue();
         log.info("Inserted report id={}", id);
 
-        // 2. UPDATE  status = processing
-        db.update("UPDATE reports SET status='processing', updated_at=NOW() WHERE id=?", id);
+        insertSpendingHistory(id, req.spendingLast6);
+        insertComplaints(id, req.complaintHistory);
+        insertNetworkQuality(id, req.networkQuality);
 
-        // 3. Call LLM
-        String reportContent;
-        try {
-            reportContent = callLLM(req);
-            // 4a. UPDATE  status = completed
-            db.update("UPDATE reports SET status='completed', report_content=?, updated_at=NOW() WHERE id=?",
-                    reportContent, id);
-        } catch (Exception e) {
-            log.error("LLM call failed for report id={}", id, e);
-            // 4b. UPDATE  status = failed
-            db.update("UPDATE reports SET status='failed', report_content=?, updated_at=NOW() WHERE id=?",
-                    "Generation failed: " + e.getMessage(), id);
-        }
+        // 2. Push careplan_id to Redis queue
+        redis.opsForList().leftPush(QUEUE_KEY, String.valueOf(id));
+        log.info("Enqueued report id={} to Redis queue '{}'", id, QUEUE_KEY);
 
-        // 5. Return the full row
-        return ResponseEntity.ok(getById(id));
+        // 3. Return immediately
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("id", id);
+        body.put("status", "pending");
+        body.put("message", "已收到，报告将在后台生成");
+        return ResponseEntity.accepted().body(body);
     }
 
     // ────────── GET /api/reports?search=xxx ──────────
 
     @GetMapping
     public List<ReportResponse> list(@RequestParam(required = false) String search) {
+        String baseSql = "SELECT " +
+                "r.id, " +
+                "c.customer_id AS customer_id, " +
+                "c.customer_name AS customer_name, " +
+                "c.national_id AS national_id, " +
+                "m.manager_name AS manager_name, " +
+                "m.manager_id AS manager_id, " +
+                "r.service_code, " +
+                "r.current_plan, " +
+                "r.additional_services, " +
+                "COALESCE((SELECT '[' || string_agg(sh.amount::text, ',' ORDER BY sh.month) || ']' " +
+                "          FROM spending_history sh WHERE sh.report_id = r.id), '[]') AS spending_last6, " +
+                "COALESCE((SELECT string_agg(cp.description, '||' ORDER BY cp.complaint_date, cp.id) " +
+                "          FROM complaints cp WHERE cp.report_id = r.id), '') AS complaint_history, " +
+                "COALESCE((SELECT nq.value FROM network_quality nq WHERE nq.report_id = r.id ORDER BY nq.id DESC LIMIT 1), '') AS network_quality, " +
+                "r.status, " +
+                "r.report_content, " +
+                "r.created_at, " +
+                "r.updated_at " +
+                "FROM reports r " +
+                "JOIN customers c ON r.customer_id = c.id " +
+                "JOIN managers m ON r.manager_id = m.id ";
+
         if (search != null && !search.isBlank()) {
             String like = "%" + search.trim() + "%";
             return db.query(
-                "SELECT * FROM reports WHERE " +
-                "customer_id ILIKE ? OR customer_name ILIKE ? OR manager_name ILIKE ? " +
-                "OR service_code ILIKE ? OR current_plan ILIKE ? OR manager_id ILIKE ? " +
-                "ORDER BY created_at DESC",
+                baseSql +
+                "WHERE c.customer_id ILIKE ? OR c.customer_name ILIKE ? OR m.manager_name ILIKE ? " +
+                "OR r.service_code ILIKE ? OR r.current_plan ILIKE ? OR m.manager_id ILIKE ? " +
+                "ORDER BY r.created_at DESC",
                 (rs, i) -> mapRow(rs),
                 like, like, like, like, like, like
             );
         }
-        return db.query("SELECT * FROM reports ORDER BY created_at DESC",
+        return db.query(baseSql + "ORDER BY r.created_at DESC",
                 (rs, i) -> mapRow(rs));
     }
 
@@ -191,10 +208,99 @@ public class ReportController {
 
     private ReportResponse getById(Long id) {
         List<ReportResponse> rows = db.query(
-                "SELECT * FROM reports WHERE id=?",
+                "SELECT " +
+                "r.id, " +
+                "c.customer_id AS customer_id, " +
+                "c.customer_name AS customer_name, " +
+                "c.national_id AS national_id, " +
+                "m.manager_name AS manager_name, " +
+                "m.manager_id AS manager_id, " +
+                "r.service_code, " +
+                "r.current_plan, " +
+                "r.additional_services, " +
+                "COALESCE((SELECT '[' || string_agg(sh.amount::text, ',' ORDER BY sh.month) || ']' " +
+                "          FROM spending_history sh WHERE sh.report_id = r.id), '[]') AS spending_last6, " +
+                "COALESCE((SELECT string_agg(cp.description, '||' ORDER BY cp.complaint_date, cp.id) " +
+                "          FROM complaints cp WHERE cp.report_id = r.id), '') AS complaint_history, " +
+                "COALESCE((SELECT nq.value FROM network_quality nq WHERE nq.report_id = r.id ORDER BY nq.id DESC LIMIT 1), '') AS network_quality, " +
+                "r.status, " +
+                "r.report_content, " +
+                "r.created_at, " +
+                "r.updated_at " +
+                "FROM reports r " +
+                "JOIN customers c ON r.customer_id = c.id " +
+                "JOIN managers m ON r.manager_id = m.id " +
+                "WHERE r.id=?",
                 (rs, i) -> mapRow(rs),
                 id);
         return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private Long upsertCustomer(ReportRequest req) {
+        return db.queryForObject(
+                "INSERT INTO customers (customer_id, customer_name, national_id) VALUES (?,?,?) " +
+                "ON CONFLICT (customer_id) DO UPDATE SET " +
+                "customer_name = EXCLUDED.customer_name, " +
+                "national_id = EXCLUDED.national_id, " +
+                "updated_at = NOW() " +
+                "RETURNING id",
+                Long.class,
+                req.customerId,
+                req.customerName,
+                req.nationalId
+        );
+    }
+
+    private Long upsertManager(ReportRequest req) {
+        return db.queryForObject(
+                "INSERT INTO managers (manager_id, manager_name) VALUES (?,?) " +
+                "ON CONFLICT (manager_id) DO UPDATE SET " +
+                "manager_name = EXCLUDED.manager_name, " +
+                "updated_at = NOW() " +
+                "RETURNING id",
+                Long.class,
+                req.managerId,
+                req.managerName
+        );
+    }
+
+    private void insertSpendingHistory(Long reportId, List<Double> spendingLast6) {
+        if (spendingLast6 == null || spendingLast6.isEmpty()) return;
+
+        YearMonth start = YearMonth.now().minusMonths(spendingLast6.size() - 1L);
+        for (int i = 0; i < spendingLast6.size(); i++) {
+            YearMonth ym = start.plusMonths(i);
+            db.update(
+                    "INSERT INTO spending_history (report_id, month, amount) VALUES (?,?,?)",
+                    reportId,
+                    java.sql.Date.valueOf(ym.atDay(1)),
+                    spendingLast6.get(i)
+            );
+        }
+    }
+
+    private void insertComplaints(Long reportId, List<String> complaintHistory) {
+        if (complaintHistory == null || complaintHistory.isEmpty()) return;
+
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < complaintHistory.size(); i++) {
+            db.update(
+                    "INSERT INTO complaints (report_id, complaint_date, description) VALUES (?,?,?)",
+                    reportId,
+                    java.sql.Date.valueOf(today.minusDays(complaintHistory.size() - 1L - i)),
+                    complaintHistory.get(i)
+            );
+        }
+    }
+
+    private void insertNetworkQuality(Long reportId, String networkQuality) {
+        if (networkQuality == null || networkQuality.isBlank()) return;
+        db.update(
+                "INSERT INTO network_quality (report_id, metric, value) VALUES (?,?,?)",
+                reportId,
+                "summary",
+                networkQuality
+        );
     }
 
     private ReportResponse mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {

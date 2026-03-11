@@ -18,6 +18,16 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     ports:
@@ -26,11 +36,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fastreport
       SPRING_DATASOURCE_USERNAME: fastreport
       SPRING_DATASOURCE_PASSWORD: fastreport123
+      SPRING_DATA_REDIS_HOST: redis
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:
