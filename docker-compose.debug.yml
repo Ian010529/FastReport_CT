@@ -1,0 +1,30 @@
+services:
+  backend:
+    ports:
+      - "5005:5005"
+    command:
+      - java
+      - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+      - -jar
+      - /app/app.jar
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    command:
+      - npm
+      - run
+      - dev
+      - --
+      - --hostname
+      - 0.0.0.0
+      - --port
+      - "3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      WATCHPACK_POLLING: "true"
