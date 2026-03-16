@@ -7,10 +7,11 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:fastreport}
     password: ${SPRING_DATASOURCE_PASSWORD:fastreport123}
     driver-class-name: org.postgresql.Driver
-  data:
-    redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: 6379
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
   jackson:
     default-property-inclusion: non_null
 
