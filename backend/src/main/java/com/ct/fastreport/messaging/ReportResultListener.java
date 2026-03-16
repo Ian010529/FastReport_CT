@@ -1,5 +1,8 @@
-package com.ct.fastreport;
+package com.ct.fastreport.messaging;
 
+import com.ct.fastreport.config.RabbitConfig;
+import com.ct.fastreport.dto.ReportResultMessage;
+import com.ct.fastreport.service.ReportSseService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 

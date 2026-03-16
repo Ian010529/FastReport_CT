@@ -1,4 +1,4 @@
-package com.ct.fastreport;
+package com.ct.fastreport.config;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;

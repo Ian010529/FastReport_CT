@@ -1,4 +1,4 @@
-package com.ct.fastreport;
+package com.ct.fastreport.dto;
 
 public class ReportJobMessage {
     private Long reportId;

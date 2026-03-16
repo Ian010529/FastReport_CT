@@ -1,5 +1,7 @@
-package com.ct.fastreport;
+package com.ct.fastreport.messaging;
 
+import com.ct.fastreport.config.RabbitConfig;
+import com.ct.fastreport.dto.ReportResultMessage;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 

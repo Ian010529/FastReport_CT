@@ -1,4 +1,4 @@
-package com.ct.fastreport;
+package com.ct.fastreport.dto;
 
 public class ReportResponse {
     public Long id;
