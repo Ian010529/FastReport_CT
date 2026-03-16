@@ -1,6 +1,6 @@
 # FastReport_CT
 
-FastReport_CT is a full-stack MVP for generating telecom customer care plans.
+FastReport_CT is a full-stack application for generating telecom customer care plans.
 
 The current implementation uses:
 
@@ -8,9 +8,16 @@ The current implementation uses:
 - `Spring Boot` + `JdbcTemplate` for the backend
 - `PostgreSQL` for persistence
 - `RabbitMQ` for asynchronous job delivery and retry
+- `Server-Sent Events (SSE)` for real-time report status updates to the frontend
 - An OpenAI-compatible Chat Completions API for care plan generation
 
-The system is intentionally kept simple in one important way: the frontend does not auto-refresh. After a report is submitted, the backend processes it asynchronously, but the UI will not update unless the user manually refreshes or reopens the page.
+## Branches
+
+| Branch | Description |
+|---|---|
+| `master` | Stable, merged releases |
+| `v0.1` | Initial MVP: RabbitMQ async processing, retry strategy, export, manual refresh only |
+| `v0.2` | Current development: SSE real-time push, result listener, structured improvements |
 
 ## Overview
 
@@ -19,10 +26,13 @@ Current flow:
 1. A user submits a report request from the frontend.
 2. The backend stores the request and returns immediately with status `pending`.
 3. The backend publishes a RabbitMQ job.
-4. A Spring Boot worker consumes the job.
-5. The worker calls the LLM to generate the care plan.
-6. The worker updates the report status in PostgreSQL to `processing`, `completed`, or `failed`.
-7. The frontend only sees the new status after a manual refresh.
+4. The frontend opens an SSE connection to receive real-time status updates.
+5. A Spring Boot worker consumes the job.
+6. The worker calls the LLM to generate the care plan.
+7. The worker updates the report status in PostgreSQL to `processing`, `completed`, or `failed`.
+8. The `ReportResultPublisher` publishes the result back to a RabbitMQ result queue.
+9. The `ReportResultListener` consumes the result and pushes the update via SSE to any connected frontend clients.
+10. The frontend receives the push and updates the UI without a manual refresh.
 
 ## Tech Stack
 
@@ -32,6 +42,7 @@ Current flow:
 | Backend | Java 17, Spring Boot 3.2.5, Spring Web, Spring AMQP, JdbcTemplate |
 | Database | PostgreSQL 16 |
 | Message Broker | RabbitMQ 3 with Management UI |
+| Real-time Push | Server-Sent Events (SSE) via Spring SseEmitter |
 | PDF Export | iText 8 |
 | AI API | OpenAI-compatible Chat Completions API |
 | Local Runtime | Docker Compose |
@@ -60,6 +71,10 @@ Current flow:
 │       │   ├── ReportJobPublisher.java
 │       │   ├── ReportRequest.java
 │       │   ├── ReportResponse.java
+│       │   ├── ReportResultListener.java
+│       │   ├── ReportResultMessage.java
+│       │   ├── ReportResultPublisher.java
+│       │   ├── ReportSseService.java
 │       │   └── ReportWorker.java
 │       └── resources/
 │           ├── application.yml
@@ -94,6 +109,14 @@ Current flow:
   - `completed`
   - `failed`
 - If the LLM call fails, the job is retried up to 3 times
+- On completion or failure, the result is published to a dedicated RabbitMQ result queue
+
+### Real-Time Status Updates via SSE
+
+- The frontend opens an SSE connection to `GET /api/reports/{id}/sse` after submitting a request
+- `ReportResultListener` consumes messages from the result queue
+- `ReportSseService` manages per-report SSE emitters and delivers push events
+- The frontend React component updates the UI immediately without polling or manual refresh
 
 ### Retry Strategy
 
@@ -125,16 +148,15 @@ Completed reports can be downloaded as:
 - PDF
 - CSV
 
-## Important UX Behavior
+## UX Behavior
 
-This project intentionally does not use:
+As of v0.1, real-time updates are delivered via SSE:
 
-- polling
-- Server-Sent Events
-- WebSockets
-- automatic UI refresh
+- After report submission, the detail page opens an SSE connection
+- Status transitions (`pending` → `processing` → `completed` / `failed`) are pushed to the browser in real time
+- No polling or manual refresh is required on the detail page
 
-As a result, if the worker finishes generating a care plan in the background, the frontend will not reflect the new status until the user manually refreshes the list or reopens the detail page.
+The list page (`/`) still reflects the last known state at page load. A full refresh is needed to see updated statuses in the report list.
 
 ## API Summary
 
@@ -143,6 +165,7 @@ As a result, if the worker finishes generating a care plan in the background, th
 | POST | `/api/reports` | Create a report and enqueue async generation |
 | GET | `/api/reports` | List reports |
 | GET | `/api/reports/{id}` | Get one report |
+| GET | `/api/reports/{id}/sse` | Open SSE stream for real-time status updates |
 | GET | `/api/reports/{id}/download?format=txt\|pdf\|csv` | Download report content |
 
 ### Example Request
@@ -259,11 +282,14 @@ VSCode debug helpers are already included in:
 
 The async components are:
 
-- `ReportController`: creates the report and publishes the first job
-- `ReportJobPublisher`: sends initial and retry messages
-- `RabbitConfig`: declares the main queue and retry queues
+- `ReportController`: creates the report, publishes the first job, and exposes the SSE endpoint
+- `ReportJobPublisher`: sends initial and retry messages to the job queue
+- `RabbitConfig`: declares the main queue, retry queues, and the result queue
 - `ReportWorker`: consumes jobs from RabbitMQ
 - `ReportGenerationService`: loads report data, calls the LLM, and updates database status
+- `ReportResultPublisher`: publishes result events to the result queue after job completion
+- `ReportResultListener`: consumes result events and forwards them to `ReportSseService`
+- `ReportSseService`: manages active SSE emitters by report ID and pushes events to connected clients
 
 ### Status Lifecycle
 
@@ -360,12 +386,13 @@ Expected result:
 - Backend persistence logic is still fairly controller-centric
 - No audit trail for retry history or error details in the database
 - No worker scaling controls or concurrency tuning yet
-- No frontend live updates by design
+- The report list page does not receive SSE updates; only the detail page does
 
-## Next Improvement Ideas
+## Next Improvement Ideas (v0.2 Targets)
 
 - Store failure reason and retry metadata in the database
 - Split persistence and query logic into repository/service layers
 - Add Flyway or Liquibase for versioned schema migration
 - Introduce structured job tables for better observability
 - Add tests for worker retry and status transitions
+- Extend SSE to the report list page for live status updates across all reports
