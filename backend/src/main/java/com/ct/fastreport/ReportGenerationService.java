@@ -40,7 +40,7 @@ public class ReportGenerationService {
         this.db = db;
     }
 
-    public void generateCarePlan(Long reportId) throws Exception {
+    public String generateCarePlan(Long reportId) throws Exception {
         ReportPromptData data = loadPromptData(reportId);
         if (data == null) {
             throw new IllegalArgumentException("Report not found: " + reportId);
@@ -58,6 +58,7 @@ public class ReportGenerationService {
                 content,
                 reportId
         );
+        return content;
     }
 
     public void markFailed(Long reportId) {

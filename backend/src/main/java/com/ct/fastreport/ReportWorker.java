@@ -12,10 +12,14 @@ public class ReportWorker {
 
     private final ReportGenerationService reportGenerationService;
     private final ReportJobPublisher reportJobPublisher;
+    private final ReportResultPublisher reportResultPublisher;
 
-    public ReportWorker(ReportGenerationService reportGenerationService, ReportJobPublisher reportJobPublisher) {
+    public ReportWorker(ReportGenerationService reportGenerationService,
+                        ReportJobPublisher reportJobPublisher,
+                        ReportResultPublisher reportResultPublisher) {
         this.reportGenerationService = reportGenerationService;
         this.reportJobPublisher = reportJobPublisher;
+        this.reportResultPublisher = reportResultPublisher;
     }
 
     @RabbitListener(queues = RabbitConfig.MAIN_QUEUE)
@@ -28,7 +32,8 @@ public class ReportWorker {
         log.info("Worker picked report id={} attempt={}/{}", reportId, attemptNumber, totalAttempts);
 
         try {
-            reportGenerationService.generateCarePlan(reportId);
+            String reportContent = reportGenerationService.generateCarePlan(reportId);
+            reportResultPublisher.publishResult(new ReportResultMessage(reportId, "completed", reportContent));
             log.info("Worker completed report id={} attempt={}/{}", reportId, attemptNumber, totalAttempts);
         } catch (Exception ex) {
             log.error("Worker failed report id={} attempt={}/{}", reportId, attemptNumber, totalAttempts, ex);
@@ -40,6 +45,7 @@ public class ReportWorker {
             }
 
             reportGenerationService.markFailed(reportId);
+            reportResultPublisher.publishResult(new ReportResultMessage(reportId, "failed", null));
             log.error("Report id={} marked as failed after {} retries", reportId, reportJobPublisher.maxRetries());
         }
     }

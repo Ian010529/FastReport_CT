@@ -19,9 +19,11 @@ public class RabbitConfig {
     public static final String RETRY_QUEUE_1 = "report.generate.retry.1.queue";
     public static final String RETRY_QUEUE_2 = "report.generate.retry.2.queue";
     public static final String RETRY_QUEUE_3 = "report.generate.retry.3.queue";
+    public static final String RESULT_QUEUE = "report.result.queue";
     public static final String RETRY_ROUTING_KEY_1 = "report.generate.retry.1";
     public static final String RETRY_ROUTING_KEY_2 = "report.generate.retry.2";
     public static final String RETRY_ROUTING_KEY_3 = "report.generate.retry.3";
+    public static final String RESULT_ROUTING_KEY = "report.result";
     public static final long RETRY_DELAY_1_MS = 5_000L;
     public static final long RETRY_DELAY_2_MS = 10_000L;
     public static final long RETRY_DELAY_3_MS = 20_000L;
@@ -52,6 +54,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue reportResultQueue() {
+        return QueueBuilder.durable(RESULT_QUEUE).build();
+    }
+
+    @Bean
     public Binding reportGenerateBinding() {
         return BindingBuilder.bind(reportGenerateQueue()).to(reportExchange()).with(MAIN_ROUTING_KEY);
     }
@@ -69,6 +76,11 @@ public class RabbitConfig {
     @Bean
     public Binding reportRetryBinding3() {
         return BindingBuilder.bind(reportRetryQueue3()).to(reportExchange()).with(RETRY_ROUTING_KEY_3);
+    }
+
+    @Bean
+    public Binding reportResultBinding() {
+        return BindingBuilder.bind(reportResultQueue()).to(reportExchange()).with(RESULT_ROUTING_KEY);
     }
 
     @Bean

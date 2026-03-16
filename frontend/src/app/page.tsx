@@ -27,6 +27,12 @@ interface FormData {
   networkQuality: string;
 }
 
+interface ReportResultEvent {
+  reportId: number;
+  status: string;
+  reportContent: string | null;
+}
+
 const defaultForm: FormData = {
   customerId: "10000001",
   customerName: "张三",
@@ -46,10 +52,46 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [fetched, setFetched] = useState(false);
+  const [activeReportId, setActiveReportId] = useState<number | null>(null);
+  const [liveMessage, setLiveMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReports();
   }, []); // 确保只在组件挂载时调用一次
+
+  useEffect(() => {
+    if (activeReportId == null) return;
+
+    const source = new EventSource(`${API}/api/reports/${activeReportId}/events`);
+
+    source.addEventListener("connected", () => {
+      setLiveMessage(`SSE connected for report #${activeReportId}. Waiting for worker result...`);
+    });
+
+    source.addEventListener("report-result", async (event) => {
+      const data = JSON.parse((event as MessageEvent).data) as ReportResultEvent;
+      setLiveMessage(`Report #${data.reportId} is now ${data.status}.`);
+      setReports((current) =>
+        current.map((report) =>
+          report.id === data.reportId
+            ? { ...report, status: data.status }
+            : report
+        )
+      );
+      await fetchReports();
+      setActiveReportId(null);
+      source.close();
+    });
+
+    source.onerror = () => {
+      setLiveMessage(`SSE connection for report #${activeReportId} was interrupted.`);
+      source.close();
+    };
+
+    return () => {
+      source.close();
+    };
+  }, [activeReportId]);
 
   const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -93,7 +135,8 @@ export default function Home() {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const created = await res.json();
-      alert(`报告 #${created.id} 已收到，正在后台生成`);
+      setActiveReportId(created.id);
+      setLiveMessage(`Report #${created.id} submitted. Opening SSE channel...`);
       await fetchReports();
     } catch (err: unknown) {
       alert("生成失败: " + (err instanceof Error ? err.message : err));
@@ -110,6 +153,11 @@ export default function Home() {
       {/* ───── Form ───── */}
       <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold mb-4">📝 新建报告</h2>
+        {liveMessage && (
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            {liveMessage}
+          </div>
+        )}
         <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className={label}>客户编号 (8位)</label>

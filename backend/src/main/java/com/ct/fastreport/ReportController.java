@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -41,10 +42,14 @@ public class ReportController {
 
     private final JdbcTemplate db;
     private final ReportJobPublisher reportJobPublisher;
+    private final ReportSseService reportSseService;
 
-    public ReportController(JdbcTemplate db, ReportJobPublisher reportJobPublisher) {
+    public ReportController(JdbcTemplate db,
+                            ReportJobPublisher reportJobPublisher,
+                            ReportSseService reportSseService) {
         this.db = db;
         this.reportJobPublisher = reportJobPublisher;
+        this.reportSseService = reportSseService;
     }
 
     @PostMapping
@@ -135,6 +140,11 @@ public class ReportController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(r);
+    }
+
+    @GetMapping(value = "/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribe(@PathVariable Long id) {
+        return reportSseService.subscribe(id);
     }
 
     @GetMapping("/{id}/download")
