@@ -1,0 +1,54 @@
+export interface ReportSummary {
+  id: number;
+  customerId: string;
+  customerName: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface ReportDetail extends ReportSummary {
+  nationalId: string;
+  managerName: string;
+  managerId: string;
+  serviceCode: string;
+  currentPlan: string;
+  reportContent: string | null;
+}
+
+export interface ReportFormValues {
+  customerId: string;
+  customerName: string;
+  nationalId: string;
+  managerName: string;
+  managerId: string;
+  serviceCode: string;
+  currentPlan: string;
+  additionalServices: string;
+  spendingLast6: string;
+  complaintHistory: string;
+  networkQuality: string;
+}
+
+export interface CreateReportPayload {
+  customerId: string;
+  customerName: string;
+  nationalId: string;
+  managerName: string;
+  managerId: string;
+  serviceCode: string;
+  currentPlan: string;
+  additionalServices: string[];
+  spendingLast6: number[];
+  complaintHistory: string[];
+  networkQuality: string;
+}
+
+export interface CreateReportResponse {
+  id: number;
+}
+
+export interface ReportResultEvent {
+  reportId: number;
+  status: string;
+  reportContent: string | null;
+}
