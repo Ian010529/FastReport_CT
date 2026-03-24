@@ -37,6 +37,11 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
         <!-- Jackson (included by starter-web, listed for clarity) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
