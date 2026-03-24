@@ -52,5 +52,5 @@ CREATE TABLE IF NOT EXISTS network_quality (
     id              BIGSERIAL PRIMARY KEY,
     report_id       BIGINT NOT NULL REFERENCES reports(id),
     metric          VARCHAR(50) NOT NULL,
-    value           VARCHAR(50) NOT NULL
+    value           TEXT NOT NULL
 );

@@ -15,6 +15,8 @@ export function ReportDetailView({
   report,
   reportId,
 }: ReportDetailViewProps) {
+  const parsedReport = parseStructuredReport(report.reportContent);
+
   return (
     <div className="space-y-6">
       <Link href="/" className="text-sm font-medium text-slate-600 hover:text-slate-950">
@@ -75,19 +77,60 @@ export function ReportDetailView({
       </SectionCard>
 
       {report.status === "completed" && report.reportContent ? (
-        <SectionCard className="overflow-hidden">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Report Content
-            </p>
-            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-              Generated report output
-            </h3>
+        <div className="space-y-5">
+          <SectionCard className="overflow-hidden">
+          <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Report Content
+              </p>
+              <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                {parsedReport.title}
+              </h3>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                The final report is presented as a structured reading view with clear sections for faster review and handoff.
+              </p>
+            </div>
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              {parsedReport.sections.length} structured sections
+            </div>
           </div>
-          <div className="prose prose-slate max-w-none prose-headings:tracking-tight prose-p:text-slate-700">
-            <ReactMarkdown>{report.reportContent}</ReactMarkdown>
-          </div>
-        </SectionCard>
+          {parsedReport.sections.length > 0 ? (
+            <div className="mt-6 grid gap-4 xl:grid-cols-2">
+              {parsedReport.sections.map((section, index) => (
+                <article
+                  key={section.title}
+                  className={`rounded-[24px] border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-5 sm:p-6 ${
+                    index === 0 || index === parsedReport.sections.length - 1
+                      ? "xl:col-span-2"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        Section {index + 1}
+                      </p>
+                      <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                        {section.title}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="prose prose-slate mt-5 max-w-none prose-headings:tracking-tight prose-p:text-[15px] prose-p:leading-7 prose-li:my-1 prose-li:marker:text-sky-500 prose-strong:text-slate-950">
+                    <ReactMarkdown>{section.body}</ReactMarkdown>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-[24px] border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 p-5 sm:p-7">
+              <div className="prose prose-slate max-w-none prose-headings:mb-4 prose-headings:tracking-tight prose-h1:text-3xl prose-h2:mt-10 prose-h2:border-t prose-h2:border-slate-200 prose-h2:pt-6 prose-h2:text-xl prose-h3:mt-6 prose-h3:text-lg prose-p:text-[15px] prose-p:leading-7 prose-li:my-1 prose-li:marker:text-sky-500 prose-strong:text-slate-950">
+                <ReactMarkdown>{report.reportContent}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+          </SectionCard>
+        </div>
       ) : (
         <SectionCard>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
@@ -103,6 +146,59 @@ export function ReportDetailView({
       )}
     </div>
   );
+}
+
+function parseStructuredReport(content: string | null): {
+  title: string;
+  sections: Array<{ title: string; body: string }>;
+} {
+  if (!content || !content.trim()) {
+    return { title: "Final Report", sections: [] };
+  }
+
+  const lines = content.split("\n");
+  let title = "Final Report";
+  const sections: Array<{ title: string; body: string }> = [];
+  let currentSection: { title: string; body: string[] } | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+
+    if (line.startsWith("# ")) {
+      title = line.replace(/^#\s+/, "").trim() || title;
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      if (currentSection) {
+        sections.push({
+          title: currentSection.title,
+          body: currentSection.body.join("\n").trim(),
+        });
+      }
+      currentSection = {
+        title: line.replace(/^##\s+/, "").trim(),
+        body: [],
+      };
+      continue;
+    }
+
+    if (currentSection) {
+      currentSection.body.push(rawLine);
+    }
+  }
+
+  if (currentSection) {
+    sections.push({
+      title: currentSection.title,
+      body: currentSection.body.join("\n").trim(),
+    });
+  }
+
+  return {
+    title,
+    sections: sections.filter((section) => section.body.length > 0),
+  };
 }
 
 function DetailItem({

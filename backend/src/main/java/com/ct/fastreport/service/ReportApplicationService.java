@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ public class ReportApplicationService {
         this.reportExportService = reportExportService;
     }
 
+    @Transactional
     public Map<String, Object> create(ReportRequest req) {
         validateRequest(req);
         log.info("Creating report for customer {}", req.customerId);
@@ -88,7 +90,7 @@ public class ReportApplicationService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", id);
         body.put("status", "pending");
-        body.put("message", "已收到，Care Plan 将在后台生成。若你不主动刷新页面，将不会看到状态变化。");
+        body.put("message", "Report accepted. It will be generated in the background.");
         if (!warnings.isEmpty()) {
             body.put("warnings", warnings);
             body.put("overrideReason", req.overrideReason);

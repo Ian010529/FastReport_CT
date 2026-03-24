@@ -50,7 +50,7 @@ public class ReportGenerationService {
         reportRepository.markProcessing(reportId);
         String content = callLLM(report);
         if (content == null || content.isBlank()) {
-            throw new IllegalStateException("LLM returned empty care plan for report " + reportId);
+            throw new IllegalStateException("LLM returned empty report content for report " + reportId);
         }
 
         reportRepository.markCompleted(reportId, content);
@@ -63,15 +63,27 @@ public class ReportGenerationService {
 
     private String callLLM(ReportResponse report) throws Exception {
         String prompt = buildPrompt(report);
-        log.debug("Care plan prompt length={} for report {}", prompt.length(), report.id);
+        log.debug("Report prompt length={} for report {}", prompt.length(), report.id);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("messages", List.of(
                 Map.of("role", "system", "content",
-                        "You are a China Telecom customer retention and service optimization expert. " +
-                        "Generate a practical care plan in Chinese with markdown headings. " +
-                        "The care plan must include: 1. 客户概况 2. 关键问题 3. 挽留/关怀动作 4. 跟进建议 5. 风险提示."),
+                        "You are a telecom reporting specialist for China Telecom. " +
+                        "Generate a professional telecom customer report in English using clean, structured markdown. " +
+                        "The output must be easy to scan, operationally useful, and suitable for a business user rather than an engineer. " +
+                        "Do not write in Chinese. Do not add preambles or closing remarks. " +
+                        "Use this exact structure and exact heading names: " +
+                        "# Report Summary " +
+                        "## Executive Summary " +
+                        "## Customer Profile " +
+                        "## Service Assessment " +
+                        "## Risk Signals " +
+                        "## Recommended Actions " +
+                        "## Follow-Up Plan. " +
+                        "Each section must contain short, concrete bullet points. " +
+                        "Recommended Actions must be a numbered list. " +
+                        "Follow-Up Plan must include Owner, Timeline, and Success Measure as bullets."),
                 Map.of("role", "user", "content", prompt)
         ));
         body.put("temperature", 0.4);
@@ -97,27 +109,34 @@ public class ReportGenerationService {
 
     private String buildPrompt(ReportResponse report) {
         StringBuilder sb = new StringBuilder();
-        sb.append("请基于以下客户资料，生成一个可执行的 Care Plan / 客户关怀方案。\n\n");
-        sb.append("报告ID: ").append(report.id).append("\n");
-        sb.append("客户编号: ").append(report.customerId).append("\n");
-        sb.append("客户姓名: ").append(report.customerName).append("\n");
-        sb.append("身份证号: ").append(report.nationalId).append("\n");
-        sb.append("客户经理: ").append(report.managerName).append(" (").append(report.managerId).append(")\n");
-        sb.append("业务编码: ").append(report.serviceCode).append("\n");
-        sb.append("当前套餐: ").append(report.currentPlan).append("\n");
+        sb.append("Create a telecom customer report based on the following data.\n\n");
+        sb.append("Report ID: ").append(report.id).append("\n");
+        sb.append("Customer ID: ").append(report.customerId).append("\n");
+        sb.append("Customer Name: ").append(report.customerName).append("\n");
+        sb.append("National ID: ").append(report.nationalId).append("\n");
+        sb.append("Manager: ").append(report.managerName).append(" (").append(report.managerId).append(")\n");
+        sb.append("Service Code: ").append(report.serviceCode).append("\n");
+        sb.append("Current Plan: ").append(report.currentPlan).append("\n");
         if (report.additionalServices != null && !report.additionalServices.isBlank()) {
-            sb.append("附加服务: ").append(report.additionalServices).append("\n");
+            sb.append("Additional Services: ").append(report.additionalServices).append("\n");
         }
         if (report.spendingLast6 != null && !report.spendingLast6.isBlank()) {
-            sb.append("近6月消费: ").append(report.spendingLast6).append("\n");
+            sb.append("Spending (Last 6 Months): ").append(report.spendingLast6).append("\n");
         }
         if (report.complaintHistory != null && !report.complaintHistory.isBlank()) {
-            sb.append("投诉记录: ").append(report.complaintHistory).append("\n");
+            sb.append("Complaint History: ").append(report.complaintHistory).append("\n");
         }
         if (report.networkQuality != null && !report.networkQuality.isBlank()) {
-            sb.append("网络质量: ").append(report.networkQuality).append("\n");
+            sb.append("Network Quality: ").append(report.networkQuality).append("\n");
         }
-        sb.append("\n请给出具体、可执行、适合客户经理落地的关怀方案。");
+        sb.append("\nRequirements:\n");
+        sb.append("- Write the report in English.\n");
+        sb.append("- Keep it concise, executive-friendly, and easy to scan.\n");
+        sb.append("- Use the exact heading structure defined in the system instruction.\n");
+        sb.append("- Use bullet lists in every section.\n");
+        sb.append("- Make the content specific to the provided customer data.\n");
+        sb.append("- Avoid generic filler, marketing language, or internal system terminology.\n");
+        sb.append("- Do not mention care plans; this is a report.\n");
         return sb.toString();
     }
 }

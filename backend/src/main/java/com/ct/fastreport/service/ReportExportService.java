@@ -42,21 +42,21 @@ public class ReportExportService {
 
     private ResponseEntity<byte[]> buildCsvResponse(ReportResponse report) {
         StringBuilder csv = new StringBuilder();
-        csv.append("字段,值\n");
-        csv.append("报告ID,").append(report.id).append("\n");
-        csv.append("客户编号,").append(report.customerId).append("\n");
-        csv.append("客户姓名,").append(report.customerName).append("\n");
-        csv.append("身份证号,").append(report.nationalId).append("\n");
-        csv.append("客户经理,").append(report.managerName).append("\n");
-        csv.append("经理工号,").append(report.managerId).append("\n");
-        csv.append("业务编码,").append(report.serviceCode).append("\n");
-        csv.append("当前套餐,").append(report.currentPlan).append("\n");
-        csv.append("附加服务,").append(report.additionalServices != null ? report.additionalServices : "").append("\n");
-        csv.append("近6月消费,").append(report.spendingLast6 != null ? report.spendingLast6 : "").append("\n");
-        csv.append("状态,").append(report.status).append("\n");
-        csv.append("创建时间,").append(report.createdAt).append("\n");
+        csv.append("Field,Value\n");
+        csv.append("Report ID,").append(report.id).append("\n");
+        csv.append("Customer ID,").append(report.customerId).append("\n");
+        csv.append("Customer Name,").append(report.customerName).append("\n");
+        csv.append("National ID,").append(report.nationalId).append("\n");
+        csv.append("Manager Name,").append(report.managerName).append("\n");
+        csv.append("Manager ID,").append(report.managerId).append("\n");
+        csv.append("Service Code,").append(report.serviceCode).append("\n");
+        csv.append("Current Plan,").append(report.currentPlan).append("\n");
+        csv.append("Additional Services,").append(report.additionalServices != null ? report.additionalServices : "").append("\n");
+        csv.append("Spending (Last 6 Months),").append(report.spendingLast6 != null ? report.spendingLast6 : "").append("\n");
+        csv.append("Status,").append(report.status).append("\n");
+        csv.append("Created At,").append(report.createdAt).append("\n");
         String content = report.reportContent != null ? report.reportContent.replace("\"", "\"\"") : "";
-        csv.append("报告内容,\"").append(content).append("\"\n");
+        csv.append("Report Content,\"").append(content).append("\"\n");
 
         byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
         byte[] body = csv.toString().getBytes(StandardCharsets.UTF_8);
@@ -102,13 +102,13 @@ public class ReportExportService {
             }
 
             doc.setFont(font).setFontSize(11);
-            doc.add(new Paragraph("客户服务优化报告 #" + report.id).setFontSize(16).setBold());
+            doc.add(new Paragraph("Customer Report #" + report.id).setFontSize(16).setBold());
             doc.add(new Paragraph(" "));
-            doc.add(new Paragraph("客户: " + report.customerName + " (" + report.customerId + ")"));
-            doc.add(new Paragraph("客户经理: " + report.managerName + " (" + report.managerId + ")"));
-            doc.add(new Paragraph("业务编码: " + report.serviceCode));
-            doc.add(new Paragraph("当前套餐: " + report.currentPlan));
-            doc.add(new Paragraph("创建时间: " + report.createdAt));
+            doc.add(new Paragraph("Customer: " + report.customerName + " (" + report.customerId + ")"));
+            doc.add(new Paragraph("Manager: " + report.managerName + " (" + report.managerId + ")"));
+            doc.add(new Paragraph("Service Code: " + report.serviceCode));
+            doc.add(new Paragraph("Current Plan: " + report.currentPlan));
+            doc.add(new Paragraph("Created At: " + report.createdAt));
             doc.add(new Paragraph(" "));
 
             if (report.reportContent != null) {
@@ -137,17 +137,17 @@ public class ReportExportService {
     private String buildPlainText(ReportResponse report) {
         StringBuilder sb = new StringBuilder();
         sb.append("========================================\n");
-        sb.append("  客户服务优化报告 #").append(report.id).append("\n");
+        sb.append("  Customer Report #").append(report.id).append("\n");
         sb.append("========================================\n\n");
-        sb.append("客户编号: ").append(report.customerId).append("\n");
-        sb.append("客户姓名: ").append(report.customerName).append("\n");
-        sb.append("身份证号: ").append(report.nationalId).append("\n");
-        sb.append("客户经理: ").append(report.managerName).append(" (").append(report.managerId).append(")\n");
-        sb.append("业务编码: ").append(report.serviceCode).append("\n");
-        sb.append("当前套餐: ").append(report.currentPlan).append("\n");
-        sb.append("创建时间: ").append(report.createdAt).append("\n");
+        sb.append("Customer ID: ").append(report.customerId).append("\n");
+        sb.append("Customer Name: ").append(report.customerName).append("\n");
+        sb.append("National ID: ").append(report.nationalId).append("\n");
+        sb.append("Manager: ").append(report.managerName).append(" (").append(report.managerId).append(")\n");
+        sb.append("Service Code: ").append(report.serviceCode).append("\n");
+        sb.append("Current Plan: ").append(report.currentPlan).append("\n");
+        sb.append("Created At: ").append(report.createdAt).append("\n");
         sb.append("\n────────────────────────────────────────\n\n");
-        sb.append(report.reportContent != null ? report.reportContent : "（无内容）");
+        sb.append(report.reportContent != null ? report.reportContent : "(No content)");
         sb.append("\n");
         return sb.toString();
     }
