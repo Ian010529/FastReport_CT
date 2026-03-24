@@ -1,5 +1,9 @@
-package com.ct.fastreport;
+package com.ct.fastreport.messaging;
 
+import com.ct.fastreport.config.RabbitConfig;
+import com.ct.fastreport.dto.ReportJobMessage;
+import com.ct.fastreport.dto.ReportResultMessage;
+import com.ct.fastreport.service.ReportGenerationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;

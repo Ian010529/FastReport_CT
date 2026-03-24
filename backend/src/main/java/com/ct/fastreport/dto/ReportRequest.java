@@ -1,4 +1,4 @@
-package com.ct.fastreport;
+package com.ct.fastreport.dto;
 
 import java.util.List;
 
@@ -14,4 +14,5 @@ public class ReportRequest {
     public List<Double> spendingLast6;
     public List<String> complaintHistory;
     public String networkQuality;
+    public String overrideReason;
 }

@@ -2,37 +2,36 @@
 
 FastReport_CT is a full-stack application for generating telecom customer care plans.
 
-The current implementation uses:
+The current stack uses:
 
 - `Next.js` for the frontend
 - `Spring Boot` + `JdbcTemplate` for the backend
 - `PostgreSQL` for persistence
 - `RabbitMQ` for asynchronous job delivery and retry
-- `Server-Sent Events (SSE)` for real-time report status updates to the frontend
+- `Server-Sent Events (SSE)` for real-time report status updates
 - An OpenAI-compatible Chat Completions API for care plan generation
 
 ## Branches
 
 | Branch | Description |
 |---|---|
-| `master` | Stable, merged releases |
-| `v0.1` | Initial MVP: RabbitMQ async processing, retry strategy, export, manual refresh only |
-| `v0.2` | Current development: SSE real-time push, result listener, structured improvements |
+| `master` | Stable release branch |
+| `v0.3` | Current development branch |
 
 ## Overview
 
 Current flow:
 
-1. A user submits a report request from the frontend.
-2. The backend stores the request and returns immediately with status `pending`.
-3. The backend publishes a RabbitMQ job.
-4. The frontend opens an SSE connection to receive real-time status updates.
-5. A Spring Boot worker consumes the job.
-6. The worker calls the LLM to generate the care plan.
-7. The worker updates the report status in PostgreSQL to `processing`, `completed`, or `failed`.
-8. The `ReportResultPublisher` publishes the result back to a RabbitMQ result queue.
-9. The `ReportResultListener` consumes the result and pushes the update via SSE to any connected frontend clients.
-10. The frontend receives the push and updates the UI without a manual refresh.
+1. The user submits a report request from the frontend.
+2. The backend validates the payload and runs duplicate-detection checks.
+3. If the request is valid, the backend stores the report and returns `202 Accepted`.
+4. The backend publishes a RabbitMQ job for asynchronous processing.
+5. The frontend opens an SSE connection for the new report.
+6. A Spring Boot worker consumes the RabbitMQ job.
+7. The worker calls the LLM to generate the care plan.
+8. The worker updates report status in PostgreSQL to `processing`, `completed`, or `failed`.
+9. The worker publishes a result event to a RabbitMQ result queue.
+10. The backend listens for the result event and pushes it to connected SSE clients.
 
 ## Tech Stack
 
@@ -42,7 +41,7 @@ Current flow:
 | Backend | Java 17, Spring Boot 3.2.5, Spring Web, Spring AMQP, JdbcTemplate |
 | Database | PostgreSQL 16 |
 | Message Broker | RabbitMQ 3 with Management UI |
-| Real-time Push | Server-Sent Events (SSE) via Spring SseEmitter |
+| Real-time Push | Server-Sent Events via Spring `SseEmitter` |
 | PDF Export | iText 8 |
 | AI API | OpenAI-compatible Chat Completions API |
 | Local Runtime | Docker Compose |
@@ -63,19 +62,13 @@ Current flow:
 │   └── src/main/
 │       ├── java/com/ct/fastreport/
 │       │   ├── Application.java
-│       │   ├── CorsConfig.java
-│       │   ├── RabbitConfig.java
-│       │   ├── ReportController.java
-│       │   ├── ReportGenerationService.java
-│       │   ├── ReportJobMessage.java
-│       │   ├── ReportJobPublisher.java
-│       │   ├── ReportRequest.java
-│       │   ├── ReportResponse.java
-│       │   ├── ReportResultListener.java
-│       │   ├── ReportResultMessage.java
-│       │   ├── ReportResultPublisher.java
-│       │   ├── ReportSseService.java
-│       │   └── ReportWorker.java
+│       │   ├── config/
+│       │   ├── controller/
+│       │   ├── dto/
+│       │   ├── exception/
+│       │   ├── messaging/
+│       │   ├── repository/
+│       │   └── service/
 │       └── resources/
 │           ├── application.yml
 │           ├── mock_data.sql
@@ -83,11 +76,11 @@ Current flow:
 └── frontend/
     ├── Dockerfile
     ├── package.json
-    └── src/app/
-        ├── globals.css
-        ├── layout.tsx
-        ├── page.tsx
-        └── report/[id]/page.tsx
+    └── src/
+        ├── app/
+        ├── entities/
+        ├── features/
+        └── shared/
 ```
 
 ## Features
@@ -95,10 +88,55 @@ Current flow:
 ### Report Creation
 
 - Page: `/`
-- Accepts customer, manager, service, spending, complaint, and network-quality input
+- Accepts customer, manager, service, spending, complaint, network-quality, and override-reason input
 - Stores the request immediately
 - Publishes an async RabbitMQ job
 - Returns `202 Accepted` with `pending` status
+
+### Validation and Duplicate Detection
+
+The backend validates incoming report requests before inserting data or publishing a RabbitMQ job.
+
+Validation checks include:
+
+- required fields
+- type and null checks for array values
+- format checks for `customerId`, `managerId`, and `nationalId`
+- dictionary checks for `serviceCode`
+
+Duplicate-detection rules include:
+
+- same `customer_id` + different `national_id` -> `BLOCK`
+- same `manager_id` + different `manager_name` -> `BLOCK`
+- same customer + same service + same day -> `BLOCK`
+- same customer + same service + different day -> `WARNING`
+- same `national_id` + different `customer_id` -> `WARNING`
+
+If a warning is triggered and `overrideReason` is missing, the backend rejects the request.
+
+### Unified Error Handling
+
+The backend uses a unified exception system with:
+
+- `BaseAppException`
+- `ValidationError`
+- `BlockError`
+- `WarningException`
+- `@RestControllerAdvice` for consistent JSON error responses
+
+Error response format:
+
+```json
+{
+  "type": "VALIDATION_ERROR",
+  "code": "INVALID_CUSTOMER_ID",
+  "message": "customerId must be exactly 8 digits.",
+  "detail": {},
+  "httpStatus": 400
+}
+```
+
+The frontend API layer parses this structure into a typed `ApiError`, so UI code can branch on `type` and `code` instead of raw message text.
 
 ### Asynchronous Care Plan Generation
 
@@ -109,14 +147,14 @@ Current flow:
   - `completed`
   - `failed`
 - If the LLM call fails, the job is retried up to 3 times
-- On completion or failure, the result is published to a dedicated RabbitMQ result queue
+- On completion or final failure, the worker publishes a result event
 
 ### Real-Time Status Updates via SSE
 
-- The frontend opens an SSE connection to `GET /api/reports/{id}/sse` after submitting a request
-- `ReportResultListener` consumes messages from the result queue
-- `ReportSseService` manages per-report SSE emitters and delivers push events
-- The frontend React component updates the UI immediately without polling or manual refresh
+- The frontend opens an SSE connection to `GET /api/reports/{id}/events`
+- `ReportResultListener` consumes result events from RabbitMQ
+- `ReportSseService` manages per-report SSE emitters
+- The frontend updates the UI when a result event is received
 
 ### Retry Strategy
 
@@ -128,7 +166,7 @@ Retry schedule:
 - Retry 2: 10 seconds
 - Retry 3: 20 seconds
 
-This means each report gets:
+Each report gets:
 
 - 1 initial processing attempt
 - up to 3 retries
@@ -137,7 +175,7 @@ This means each report gets:
 ### Report Query and Detail View
 
 - `GET /api/reports` lists report history
-- `GET /api/reports/{id}` returns a single report
+- `GET /api/reports/{id}` returns one report
 - Detail page: `/report/{id}`
 
 ### Export
@@ -148,15 +186,16 @@ Completed reports can be downloaded as:
 - PDF
 - CSV
 
-## UX Behavior
+## Frontend Error UX
 
-As of v0.1, real-time updates are delivered via SSE:
+The create form now distinguishes error types instead of only showing a raw message:
 
-- After report submission, the detail page opens an SSE connection
-- Status transitions (`pending` → `processing` → `completed` / `failed`) are pushed to the browser in real time
-- No polling or manual refresh is required on the detail page
+- `VALIDATION_ERROR` -> red feedback panel + field highlighting
+- `BLOCK` -> red feedback panel + conflict field highlighting
+- `WARNING` -> amber feedback panel + `overrideReason` highlighting
+- successful submission -> green feedback panel
 
-The list page (`/`) still reflects the last known state at page load. A full refresh is needed to see updated statuses in the report list.
+This keeps frontend control flow stable even if backend wording changes.
 
 ## API Summary
 
@@ -165,12 +204,10 @@ The list page (`/`) still reflects the last known state at page load. A full ref
 | POST | `/api/reports` | Create a report and enqueue async generation |
 | GET | `/api/reports` | List reports |
 | GET | `/api/reports/{id}` | Get one report |
-| GET | `/api/reports/{id}/sse` | Open SSE stream for real-time status updates |
+| GET | `/api/reports/{id}/events` | Open SSE stream for report updates |
 | GET | `/api/reports/{id}/download?format=txt\|pdf\|csv` | Download report content |
 
-### Example Request
-
-`POST /api/reports`
+### Example Create Request
 
 ```json
 {
@@ -184,17 +221,32 @@ The list page (`/`) still reflects the last known state at page load. A full ref
   "additionalServices": ["Cloud Disk", "IPTV"],
   "spendingLast6": [199, 199, 210, 185, 199, 220],
   "complaintHistory": ["2024-12 Slow broadband speed", "2025-01 Slow customer service response"],
-  "networkQuality": "Download speed occasionally drops below 50% of subscribed bandwidth"
+  "networkQuality": "Download speed occasionally drops below 50% of subscribed bandwidth",
+  "overrideReason": "Confirmed by operator after manual review"
 }
 ```
 
-### Example Response
+### Example Success Response
 
 ```json
 {
   "id": 12,
   "status": "pending",
   "message": "Request accepted. The Care Plan will be generated in the background."
+}
+```
+
+### Example Warning Response
+
+```json
+{
+  "type": "WARNING",
+  "code": "OVERRIDE_REASON_REQUIRED",
+  "message": "Override reason is required for warning cases.",
+  "detail": {
+    "warnings": ["Same nationalId exists under a different customerId."]
+  },
+  "httpStatus": 409
 }
 ```
 
@@ -209,7 +261,7 @@ Main tables:
 - `complaints`
 - `network_quality`
 
-The backend stores report metadata and all supporting input rows in PostgreSQL, and later writes the generated care plan back into `reports.report_content`.
+The backend stores all input rows in PostgreSQL and later writes the generated care plan back into `reports.report_content`.
 
 ## Local Setup
 
@@ -247,20 +299,6 @@ Default credentials:
 
 ## Debug Mode
 
-The project keeps production-style and debug-oriented startup modes separate.
-
-### Default Mode
-
-Use only:
-
-```bash
-docker compose up --build
-```
-
-This uses the regular images and does not expose the Java debug port.
-
-### Debug Mode
-
 Use:
 
 ```bash
@@ -273,7 +311,7 @@ Debug mode adds:
 - frontend `next dev` mode
 - bind-mounted frontend source for easier breakpoint debugging
 
-VSCode debug helpers are already included in:
+VSCode helpers are already included in:
 
 - `.vscode/launch.json`
 - `.vscode/tasks.json`
@@ -282,23 +320,15 @@ VSCode debug helpers are already included in:
 
 The async components are:
 
-- `ReportController`: creates the report, publishes the first job, and exposes the SSE endpoint
-- `ReportJobPublisher`: sends initial and retry messages to the job queue
-- `RabbitConfig`: declares the main queue, retry queues, and the result queue
-- `ReportWorker`: consumes jobs from RabbitMQ
+- `ReportController`: accepts requests and returns success responses
+- `ReportApplicationService`: validates input, checks duplicates, persists report data, and publishes jobs
+- `ReportJobPublisher`: sends initial and retry messages to RabbitMQ
+- `RabbitConfig`: declares queues, exchanges, and bindings
+- `ReportWorker`: consumes report jobs
 - `ReportGenerationService`: loads report data, calls the LLM, and updates database status
-- `ReportResultPublisher`: publishes result events to the result queue after job completion
-- `ReportResultListener`: consumes result events and forwards them to `ReportSseService`
-- `ReportSseService`: manages active SSE emitters by report ID and pushes events to connected clients
-
-### Status Lifecycle
-
-The backend updates report status as follows:
-
-- `pending`: the request has been stored and queued
-- `processing`: a worker has started handling the message
-- `completed`: the care plan was generated and saved
-- `failed`: all attempts were exhausted
+- `ReportResultPublisher`: publishes result events
+- `ReportResultListener`: forwards result events to SSE clients
+- `ReportSseService`: manages active emitters by report ID
 
 ## How to Verify RabbitMQ and the Worker
 
@@ -313,86 +343,38 @@ Login with:
 - username: `fastreport`
 - password: `fastreport123`
 
-You should see queues similar to:
+Queues include:
 
 - `report.generate.queue`
 - `report.generate.retry.1.queue`
 - `report.generate.retry.2.queue`
 - `report.generate.retry.3.queue`
-
-What to expect:
-
-- a new report publishes a message to the main queue
-- if processing succeeds quickly, the message disappears almost immediately
-- if processing fails, the message moves through retry queues before returning to the main queue
+- `report.result.queue`
 
 ### Option 2: Backend Logs
-
-Watch backend logs:
 
 ```bash
 docker compose logs -f backend
 ```
 
-Typical log lines:
+Typical log sequence:
 
 - report created
-- RabbitMQ job published
+- job published
 - worker picked message
 - LLM call started
-- worker completed report
-- or retry scheduled after failure
+- report completed or retry scheduled
 
 ### Option 3: Database Check
-
-Check report status directly:
 
 ```bash
 docker compose exec db psql -U fastreport -d fastreport -c "select id, status, updated_at from reports order by id desc limit 10;"
 ```
 
-### Option 4: Manual UI Refresh
-
-1. Create a report from the frontend
-2. Wait for background processing
-3. Do not refresh
-4. Observe that the page still shows stale data
-5. Refresh manually
-6. Observe the updated status or completed care plan
-
-This is expected behavior in the current MVP.
-
-## How to Test Retry Behavior
-
-The easiest way to test retry behavior is to intentionally break the LLM configuration.
-
-For example:
-
-1. set an invalid `OPENAI_API_KEY`
-2. restart the stack
-3. submit a new report
-4. watch backend logs and RabbitMQ queues
-
-Expected result:
-
-- the worker fails
-- retries are scheduled with delay
-- after the final attempt, the report status becomes `failed`
-
 ## Current Limitations
 
 - No authentication or authorization
-- No input validation beyond basic frontend form behavior
-- Backend persistence logic is still fairly controller-centric
-- No audit trail for retry history or error details in the database
-- No worker scaling controls or concurrency tuning yet
-- The report list page does not receive SSE updates; only the detail page does
-
-## Next Improvement Ideas (v0.2 Targets)
-
-- Store failure reason and retry metadata in the database
-- Split persistence and query logic into repository/service layers
-- Add Flyway or Liquibase for versioned schema migration
-- Introduce structured job tables for better observability
-- Add tests for worker retry and status transitions
-- Extend SSE to the report list page for live status updates across all reports
+- No persistent audit table for override reasons or retry history
+- Duplicate checks still rely on current schema and `created_at` date logic
+- No Flyway or Liquibase migration management yet
+- No dedicated automated test suite for validation and error branches yet

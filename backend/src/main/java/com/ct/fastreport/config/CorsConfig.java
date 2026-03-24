@@ -1,4 +1,4 @@
-package com.ct.fastreport;
+package com.ct.fastreport.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
