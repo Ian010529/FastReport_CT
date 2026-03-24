@@ -29,7 +29,7 @@ public class ReportController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@RequestBody ReportRequest req) {
-        return reportApplicationService.create(req);
+        return ResponseEntity.accepted().body(reportApplicationService.create(req));
     }
 
     @GetMapping

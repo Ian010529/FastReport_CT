@@ -25,4 +25,14 @@ public class ManagerRepository {
                 req.managerName
         );
     }
+
+    public boolean existsDifferentManagerName(String managerId, String managerName) {
+        Integer count = db.queryForObject(
+                "SELECT COUNT(*) FROM managers WHERE manager_id = ? AND manager_name <> ?",
+                Integer.class,
+                managerId,
+                managerName
+        );
+        return count != null && count > 0;
+    }
 }

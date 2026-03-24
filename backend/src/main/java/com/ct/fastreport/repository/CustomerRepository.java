@@ -27,4 +27,14 @@ public class CustomerRepository {
                 req.nationalId
         );
     }
+
+    public boolean existsDifferentNationalId(String customerId, String nationalId) {
+        Integer count = db.queryForObject(
+                "SELECT COUNT(*) FROM customers WHERE customer_id = ? AND national_id <> ?",
+                Integer.class,
+                customerId,
+                nationalId
+        );
+        return count != null && count > 0;
+    }
 }

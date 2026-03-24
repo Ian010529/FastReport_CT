@@ -14,4 +14,5 @@ public class ReportRequest {
     public List<Double> spendingLast6;
     public List<String> complaintHistory;
     public String networkQuality;
+    public String overrideReason;
 }

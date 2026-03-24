@@ -180,6 +180,46 @@ public class ReportRepository {
         );
     }
 
+    public boolean existsSameCustomerServiceSameDay(String customerId, String serviceCode) {
+        Integer count = db.queryForObject(
+                "SELECT COUNT(*) " +
+                        "FROM reports r " +
+                        "JOIN customers c ON r.customer_id = c.id " +
+                        "WHERE c.customer_id = ? " +
+                        "AND r.service_code = ? " +
+                        "AND DATE(r.created_at) = CURRENT_DATE",
+                Integer.class,
+                customerId,
+                serviceCode
+        );
+        return count != null && count > 0;
+    }
+
+    public boolean existsSameCustomerServiceDifferentDay(String customerId, String serviceCode) {
+        Integer count = db.queryForObject(
+                "SELECT COUNT(*) " +
+                        "FROM reports r " +
+                        "JOIN customers c ON r.customer_id = c.id " +
+                        "WHERE c.customer_id = ? " +
+                        "AND r.service_code = ? " +
+                        "AND DATE(r.created_at) <> CURRENT_DATE",
+                Integer.class,
+                customerId,
+                serviceCode
+        );
+        return count != null && count > 0;
+    }
+
+    public boolean existsDifferentCustomerForNationalId(String customerId, String nationalId) {
+        Integer count = db.queryForObject(
+                "SELECT COUNT(*) FROM customers WHERE national_id = ? AND customer_id <> ?",
+                Integer.class,
+                nationalId,
+                customerId
+        );
+        return count != null && count > 0;
+    }
+
     private ReportResponse mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
         ReportResponse report = new ReportResponse();
         report.id = rs.getLong("id");

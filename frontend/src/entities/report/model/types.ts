@@ -27,6 +27,7 @@ export interface ReportFormValues {
   spendingLast6: string;
   complaintHistory: string;
   networkQuality: string;
+  overrideReason: string;
 }
 
 export interface CreateReportPayload {
@@ -41,10 +42,21 @@ export interface CreateReportPayload {
   spendingLast6: number[];
   complaintHistory: string[];
   networkQuality: string;
+  overrideReason?: string;
 }
 
 export interface CreateReportResponse {
   id: number;
+  status: string;
+  message: string;
+}
+
+export interface AppErrorPayload {
+  type: string;
+  code: string;
+  message: string;
+  detail: Record<string, unknown>;
+  httpStatus: number;
 }
 
 export interface ReportResultEvent {

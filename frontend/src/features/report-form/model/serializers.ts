@@ -27,5 +27,6 @@ export function buildCreateReportPayload(
       ? form.complaintHistory.split(",").map((record) => record.trim())
       : [],
     networkQuality: form.networkQuality,
+    overrideReason: form.overrideReason.trim() || undefined,
   };
 }
