@@ -1,6 +1,6 @@
 # FastReport_CT
 
-FastReport_CT is a full-stack application for generating telecom customer care plans.
+FastReport_CT is a full-stack application for generating, reviewing, and tracking telecom customer reports.
 
 The current stack uses:
 
@@ -85,9 +85,11 @@ Current flow:
 
 ## Features
 
-### Report Creation
+### Report Workspace
 
 - Page: `/`
+- Presents a responsive English-language workspace for report operations
+- Separates report creation, feedback, and recent report monitoring into reusable UI sections
 - Accepts customer, manager, service, spending, complaint, network-quality, and override-reason input
 - Stores the request immediately
 - Publishes an async RabbitMQ job
@@ -138,7 +140,7 @@ Error response format:
 
 The frontend API layer parses this structure into a typed `ApiError`, so UI code can branch on `type` and `code` instead of raw message text.
 
-### Asynchronous Care Plan Generation
+### Asynchronous Report Generation
 
 - Background processing is handled by a Spring Boot worker
 - Worker status transitions:
@@ -186,9 +188,11 @@ Completed reports can be downloaded as:
 - PDF
 - CSV
 
-## Frontend Error UX
+## Frontend UX
 
-The create form now distinguishes error types instead of only showing a raw message:
+The current frontend is structured as a responsive report workspace with reusable UI primitives such as section cards, feedback banners, page headers, and status badges.
+
+The create form distinguishes error types instead of only showing a raw message:
 
 - `VALIDATION_ERROR` -> red feedback panel + field highlighting
 - `BLOCK` -> red feedback panel + conflict field highlighting
