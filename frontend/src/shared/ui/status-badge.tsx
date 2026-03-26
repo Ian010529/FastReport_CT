@@ -10,8 +10,8 @@ interface StatusBadgeProps {
 export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-        REPORT_STATUS_STYLES[status] || "bg-gray-100"
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+        REPORT_STATUS_STYLES[status] || "border border-slate-200 bg-slate-100 text-slate-700"
       }`}
     >
       {REPORT_STATUS_LABELS[status] || status}

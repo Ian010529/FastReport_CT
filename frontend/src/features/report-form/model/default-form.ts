@@ -2,15 +2,15 @@ import type { ReportFormValues } from "@/entities/report/model/types";
 
 export const DEFAULT_REPORT_FORM: ReportFormValues = {
   customerId: "10000001",
-  customerName: "张三",
+  customerName: "Alex Chen",
   nationalId: "110101199003077758",
-  managerName: "李经理",
+  managerName: "Olivia Park",
   managerId: "200001",
   serviceCode: "FTTH_500M",
-  currentPlan: "畅享融合 199 套餐",
-  additionalServices: "天翼云盘,天翼高清",
+  currentPlan: "Fiber Plus 199",
+  additionalServices: "Cloud Storage,Smart TV",
   spendingLast6: "199,199,210,185,199,220",
-  complaintHistory: "2024-12 宽带网速慢,2025-01 客服响应时间过长",
-  networkQuality: "下载速率偶尔低于签约带宽的 50%",
+  complaintHistory: "2024-12 Slow broadband speed,2025-01 Delayed customer service response",
+  networkQuality: "Download speed occasionally drops below 50% of the subscribed bandwidth.",
   overrideReason: "",
 };

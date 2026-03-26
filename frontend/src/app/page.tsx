@@ -17,6 +17,7 @@ import { DEFAULT_REPORT_FORM } from "@/features/report-form/model/default-form";
 import { buildCreateReportPayload } from "@/features/report-form/model/serializers";
 import { ReportForm } from "@/features/report-form/ui/report-form";
 import { ReportList } from "@/features/report-list/ui/report-list";
+import { PageHeader } from "@/shared/ui/page-header";
 
 type FeedbackTone = "error" | "warning" | "success";
 
@@ -47,12 +48,12 @@ export default function Home() {
     const source = new EventSource(getReportEventsUrl(activeReportId));
 
     source.addEventListener("connected", () => {
-      setLiveMessage(`SSE connected for report #${activeReportId}. Waiting for worker result...`);
+      setLiveMessage(`Report #${activeReportId} is connected for live status updates.`);
     });
 
     source.addEventListener("report-result", async (event) => {
       const data = JSON.parse((event as MessageEvent).data) as ReportResultEvent;
-      setLiveMessage(`Report #${data.reportId} is now ${data.status}.`);
+      setLiveMessage(`Report #${data.reportId} is now ${readableStatus(data.status)}.`);
       setReports((current) =>
         current.map((report) =>
           report.id === data.reportId
@@ -66,7 +67,7 @@ export default function Home() {
     });
 
     source.onerror = () => {
-      setLiveMessage(`SSE connection for report #${activeReportId} was interrupted.`);
+      setLiveMessage(`Live updates were interrupted for report #${activeReportId}.`);
       source.close();
     };
 
@@ -96,7 +97,7 @@ export default function Home() {
     try {
       const created = await createReport(buildCreateReportPayload(form));
       setActiveReportId(created.id);
-      setLiveMessage(`Report #${created.id} submitted. Opening SSE channel...`);
+      setLiveMessage(`Report #${created.id} was submitted successfully.`);
       setSubmissionFeedback({
         tone: "success",
         title: "Report submitted",
@@ -115,6 +116,30 @@ export default function Home() {
 
   return (
     <div className="space-y-8">
+      <PageHeader
+        title="Generate and track customer reports"
+        subtitle="Create new report requests, review backend validation decisions, and monitor live status changes in a workspace designed for daily operations."
+      />
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid gap-4 sm:grid-cols-3 xl:col-span-2 xl:grid-cols-3">
+          <SummaryCard
+            label="Reports in view"
+            value={String(reports.length)}
+            description="Recently loaded records available in the workspace."
+          />
+          <SummaryCard
+            label="Completed"
+            value={String(reports.filter((report) => report.status === "completed").length)}
+            description="Reports ready for review and download."
+          />
+          <SummaryCard
+            label="In progress"
+            value={String(reports.filter((report) => report.status === "pending" || report.status === "processing").length)}
+            description="Reports currently waiting in the queue or being generated."
+          />
+        </div>
+      </section>
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <ReportForm
         form={form}
         feedback={submissionFeedback}
@@ -126,6 +151,7 @@ export default function Home() {
         onSubmit={submit}
       />
       <ReportList fetched={fetched} reports={reports} />
+      </div>
     </div>
   );
 }
@@ -144,7 +170,7 @@ function buildSubmissionFeedback(error: unknown): SubmissionFeedback {
     return {
       tone: "error",
       title: "Input validation failed",
-      message: error.message,
+      message: "Please review the highlighted fields before submitting the report again.",
       details: extractDetails(error),
     };
   }
@@ -153,7 +179,7 @@ function buildSubmissionFeedback(error: unknown): SubmissionFeedback {
     return {
       tone: "warning",
       title: "Confirmation required",
-      message: error.message,
+      message: "This request can continue only after you provide an override reason.",
       details: extractDetails(error),
     };
   }
@@ -161,8 +187,8 @@ function buildSubmissionFeedback(error: unknown): SubmissionFeedback {
   if (error.type === "BLOCK") {
     return {
       tone: "error",
-      title: "Request blocked by business rules",
-      message: error.message,
+      title: "Submission blocked",
+      message: "This report conflicts with an existing business rule and could not be created.",
       details: extractDetails(error),
     };
   }
@@ -173,6 +199,43 @@ function buildSubmissionFeedback(error: unknown): SubmissionFeedback {
     message: error.message,
     details: extractDetails(error),
   };
+}
+
+function SummaryCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-slate-200/80 bg-white/85 p-5 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        {value}
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+function readableStatus(status: string): string {
+  switch (status) {
+    case "pending":
+      return "pending";
+    case "processing":
+      return "processing";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    default:
+      return status;
+  }
 }
 
 function extractDetails(error: ApiError): string[] {
