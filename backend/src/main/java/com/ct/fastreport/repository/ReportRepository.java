@@ -1,7 +1,7 @@
 package com.ct.fastreport.repository;
 
-import com.ct.fastreport.dto.ReportRequest;
 import com.ct.fastreport.dto.ReportResponse;
+import com.ct.fastreport.model.InternalReportRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -22,7 +22,10 @@ public class ReportRepository {
         this.db = db;
     }
 
-    public long insertReport(Long customerDbId, Long managerDbId, ReportRequest req, String additionalSvc) {
+    public long insertReport(Long customerDbId, Long managerDbId, InternalReportRequest req) {
+        String additionalServices = req.additionalServices() == null || req.additionalServices().isEmpty()
+                ? null
+                : String.join(",", req.additionalServices());
         KeyHolder keyHolder = new GeneratedKeyHolder();
         db.update(con -> {
             PreparedStatement ps = con.prepareStatement(
@@ -32,9 +35,9 @@ public class ReportRepository {
             );
             ps.setLong(1, customerDbId);
             ps.setLong(2, managerDbId);
-            ps.setString(3, req.serviceCode);
-            ps.setString(4, req.currentPlan);
-            ps.setString(5, additionalSvc);
+            ps.setString(3, req.service().serviceCode());
+            ps.setString(4, req.currentPlan());
+            ps.setString(5, additionalServices);
             ps.setString(6, "pending");
             return ps;
         }, keyHolder);
@@ -110,48 +113,53 @@ public class ReportRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    public void insertSpendingHistory(Long reportId, List<Double> spendingLast6) {
-        if (spendingLast6 == null || spendingLast6.isEmpty()) {
+    public void insertSpendingHistory(Long reportId, List<InternalReportRequest.SpendingPoint> spendingHistory) {
+        if (spendingHistory == null || spendingHistory.isEmpty()) {
             return;
         }
 
-        YearMonth start = YearMonth.now().minusMonths(spendingLast6.size() - 1L);
-        for (int i = 0; i < spendingLast6.size(); i++) {
-            YearMonth ym = start.plusMonths(i);
+        for (InternalReportRequest.SpendingPoint point : spendingHistory) {
+            YearMonth ym = point.period() == null || point.period().isBlank()
+                    ? YearMonth.now()
+                    : YearMonth.parse(point.period());
             db.update(
                     "INSERT INTO spending_history (report_id, month, amount) VALUES (?,?,?)",
                     reportId,
                     java.sql.Date.valueOf(ym.atDay(1)),
-                    spendingLast6.get(i)
+                    point.amount()
             );
         }
     }
 
-    public void insertComplaints(Long reportId, List<String> complaintHistory) {
+    public void insertComplaints(Long reportId, List<InternalReportRequest.ComplaintRecord> complaintHistory) {
         if (complaintHistory == null || complaintHistory.isEmpty()) {
             return;
         }
 
         LocalDate today = LocalDate.now();
         for (int i = 0; i < complaintHistory.size(); i++) {
+            InternalReportRequest.ComplaintRecord complaint = complaintHistory.get(i);
+            LocalDate complaintDate = complaint.occurredOn() == null || complaint.occurredOn().isBlank()
+                    ? today.minusDays(complaintHistory.size() - 1L - i)
+                    : LocalDate.parse(complaint.occurredOn());
             db.update(
                     "INSERT INTO complaints (report_id, complaint_date, description) VALUES (?,?,?)",
                     reportId,
-                    java.sql.Date.valueOf(today.minusDays(complaintHistory.size() - 1L - i)),
-                    complaintHistory.get(i)
+                    java.sql.Date.valueOf(complaintDate),
+                    complaint.description()
             );
         }
     }
 
-    public void insertNetworkQuality(Long reportId, String networkQuality) {
-        if (networkQuality == null || networkQuality.isBlank()) {
+    public void insertNetworkQuality(Long reportId, InternalReportRequest.NetworkQualitySnapshot networkQuality) {
+        if (networkQuality == null || networkQuality.summary() == null || networkQuality.summary().isBlank()) {
             return;
         }
         db.update(
                 "INSERT INTO network_quality (report_id, metric, value) VALUES (?,?,?)",
                 reportId,
                 "summary",
-                networkQuality
+                networkQuality.summary()
         );
     }
 

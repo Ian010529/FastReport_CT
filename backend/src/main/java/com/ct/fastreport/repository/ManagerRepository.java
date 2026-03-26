@@ -1,6 +1,6 @@
 package com.ct.fastreport.repository;
 
-import com.ct.fastreport.dto.ReportRequest;
+import com.ct.fastreport.model.InternalReportRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -13,16 +13,16 @@ public class ManagerRepository {
         this.db = db;
     }
 
-    public Long upsert(ReportRequest req) {
+    public Long upsert(InternalReportRequest req) {
         return db.queryForObject(
                 "INSERT INTO managers (manager_id, manager_name) VALUES (?,?) " +
                         "ON CONFLICT (manager_id) DO UPDATE SET " +
                         "manager_name = EXCLUDED.manager_name, " +
                         "updated_at = NOW() " +
-                        "RETURNING id",
+                "RETURNING id",
                 Long.class,
-                req.managerId,
-                req.managerName
+                req.manager().managerId(),
+                req.manager().managerName()
         );
     }
 
