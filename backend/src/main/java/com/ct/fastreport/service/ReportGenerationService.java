@@ -2,22 +2,11 @@ package com.ct.fastreport.service;
 
 import com.ct.fastreport.dto.ReportResponse;
 import com.ct.fastreport.repository.ReportRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ct.fastreport.service.llm.LLMGenerationRequest;
+import com.ct.fastreport.service.llm.LLMServiceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class ReportGenerationService {
@@ -25,20 +14,12 @@ public class ReportGenerationService {
     private static final Logger log = LoggerFactory.getLogger(ReportGenerationService.class);
 
     private final ReportRepository reportRepository;
-    private final RestTemplate rest = new RestTemplate();
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final LLMServiceFactory llmServiceFactory;
 
-    @Value("${openai.api-key}")
-    private String apiKey;
-
-    @Value("${openai.base-url}")
-    private String baseUrl;
-
-    @Value("${openai.model}")
-    private String model;
-
-    public ReportGenerationService(ReportRepository reportRepository) {
+    public ReportGenerationService(ReportRepository reportRepository,
+                                   LLMServiceFactory llmServiceFactory) {
         this.reportRepository = reportRepository;
+        this.llmServiceFactory = llmServiceFactory;
     }
 
     public String generateCarePlan(Long reportId) throws Exception {
@@ -64,12 +45,8 @@ public class ReportGenerationService {
     private String callLLM(ReportResponse report) throws Exception {
         String prompt = buildPrompt(report);
         log.debug("Report prompt length={} for report {}", prompt.length(), report.id);
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
-        body.put("messages", List.of(
-                Map.of("role", "system", "content",
-                        "You are a telecom reporting specialist for China Telecom. " +
+        return llmServiceFactory.getService().generate(new LLMGenerationRequest(
+                "You are a telecom reporting specialist for China Telecom. " +
                         "Generate a professional telecom customer report in English using clean, structured markdown. " +
                         "The output must be easy to scan, operationally useful, and suitable for a business user rather than an engineer. " +
                         "Do not write in Chinese. Do not add preambles or closing remarks. " +
@@ -83,28 +60,11 @@ public class ReportGenerationService {
                         "## Follow-Up Plan. " +
                         "Each section must contain short, concrete bullet points. " +
                         "Recommended Actions must be a numbered list. " +
-                        "Follow-Up Plan must include Owner, Timeline, and Success Measure as bullets."),
-                Map.of("role", "user", "content", prompt)
+                        "Follow-Up Plan must include Owner, Timeline, and Success Measure as bullets.",
+                prompt,
+                0.4,
+                2000
         ));
-        body.put("temperature", 0.4);
-        body.put("max_tokens", 2000);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
-
-        String url = baseUrl + "/v1/chat/completions";
-        log.info("Calling LLM for report {} at {}", report.id, url);
-
-        ResponseEntity<String> response = rest.exchange(
-                url,
-                HttpMethod.POST,
-                new HttpEntity<>(mapper.writeValueAsString(body), headers),
-                String.class
-        );
-
-        JsonNode root = mapper.readTree(response.getBody());
-        return root.at("/choices/0/message/content").asText();
     }
 
     private String buildPrompt(ReportResponse report) {

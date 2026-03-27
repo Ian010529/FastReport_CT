@@ -9,14 +9,14 @@ The current stack uses:
 - `PostgreSQL` for persistence
 - `RabbitMQ` for asynchronous job delivery and retry
 - `Server-Sent Events (SSE)` for real-time report status updates
-- An OpenAI-compatible Chat Completions API for care plan generation
+- A pluggable LLM provider layer for report generation
 
 ## Branches
 
 | Branch | Description |
 |---|---|
 | `master` | Stable release branch |
-| `v0.3` | Current development branch |
+| `v0.5` | Current development branch |
 
 ## Overview
 
@@ -28,7 +28,7 @@ Current flow:
 4. The backend publishes a RabbitMQ job for asynchronous processing.
 5. The frontend opens an SSE connection for the new report.
 6. A Spring Boot worker consumes the RabbitMQ job.
-7. The worker calls the LLM to generate the care plan.
+7. The worker calls the configured LLM provider to generate the report.
 8. The worker updates report status in PostgreSQL to `processing`, `completed`, or `failed`.
 9. The worker publishes a result event to a RabbitMQ result queue.
 10. The backend listens for the result event and pushes it to connected SSE clients.
@@ -43,7 +43,7 @@ Current flow:
 | Message Broker | RabbitMQ 3 with Management UI |
 | Real-time Push | Server-Sent Events via Spring `SseEmitter` |
 | PDF Export | iText 8 |
-| AI API | OpenAI-compatible Chat Completions API |
+| AI API | Pluggable `LLMService` abstraction with OpenAI-compatible and Claude implementations |
 | Local Runtime | Docker Compose |
 | Debugging | VSCode + Chrome DevTools + Java remote debug |
 
@@ -151,6 +151,14 @@ The frontend API layer parses this structure into a typed `ApiError`, so UI code
 - If the LLM call fails, the job is retried up to 3 times
 - On completion or final failure, the worker publishes a result event
 
+### LLM Provider Abstraction
+
+- `ReportGenerationService` builds the report prompt and delegates generation through `LLMServiceFactory`
+- `LLMServiceFactory` selects the active provider from configuration
+- `OpenAICompatibleLLMService` supports OpenAI-style Chat Completions endpoints
+- `ClaudeLLMService` shows how to support a second provider without changing report-generation business logic
+- Switching providers is configuration-driven through `llm.provider`
+
 ### Real-Time Status Updates via SSE
 
 - The frontend opens an SSE connection to `GET /api/reports/{id}/events`
@@ -236,7 +244,7 @@ This keeps frontend control flow stable even if backend wording changes.
 {
   "id": 12,
   "status": "pending",
-  "message": "Request accepted. The Care Plan will be generated in the background."
+  "message": "Report accepted. It will be generated in the background."
 }
 ```
 
