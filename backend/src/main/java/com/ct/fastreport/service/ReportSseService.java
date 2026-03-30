@@ -1,6 +1,7 @@
 package com.ct.fastreport.service;
 
 import com.ct.fastreport.dto.ReportResultMessage;
+import com.ct.fastreport.monitoring.MonitoringService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,10 +20,16 @@ public class ReportSseService {
     private static final long SSE_TIMEOUT_MS = 10 * 60 * 1000L;
 
     private final Map<Long, CopyOnWriteArrayList<SseEmitter>> emittersByReportId = new ConcurrentHashMap<>();
+    private final MonitoringService monitoringService;
+
+    public ReportSseService(MonitoringService monitoringService) {
+        this.monitoringService = monitoringService;
+    }
 
     public SseEmitter subscribe(Long reportId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         emittersByReportId.computeIfAbsent(reportId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
+        updateSubscriptionGauge();
 
         emitter.onCompletion(() -> removeEmitter(reportId, emitter));
         emitter.onTimeout(() -> removeEmitter(reportId, emitter));
@@ -52,8 +59,10 @@ public class ReportSseService {
                 emitter.send(SseEmitter.event()
                         .name("report-result")
                         .data(message));
+                monitoringService.recordSsePublish(true);
                 emitter.complete();
             } catch (IOException ex) {
+                monitoringService.recordSsePublish(false);
                 emitter.completeWithError(ex);
             } finally {
                 removeEmitter(message.getReportId(), emitter);
@@ -71,5 +80,13 @@ public class ReportSseService {
         if (emitters.isEmpty()) {
             emittersByReportId.remove(reportId);
         }
+        updateSubscriptionGauge();
+    }
+
+    private void updateSubscriptionGauge() {
+        int total = emittersByReportId.values().stream()
+                .mapToInt(List::size)
+                .sum();
+        monitoringService.setActiveSseSubscriptions(total);
     }
 }

@@ -31,7 +31,61 @@ llm:
     base-url: ${CLAUDE_BASE_URL:https://api.anthropic.com}
     model: ${CLAUDE_MODEL:claude-3-5-sonnet-latest}
     api-version: ${CLAUDE_API_VERSION:2023-06-01}
+  mock:
+    failure-rate: ${LLM_MOCK_FAILURE_RATE:0.08}
+    min-latency-ms: ${LLM_MOCK_MIN_LATENCY_MS:20}
+    max-latency-ms: ${LLM_MOCK_MAX_LATENCY_MS:80}
 
 logging:
   level:
     com.ct.fastreport: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: fastreport-backend
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        fastreport.report.end_to_end.duration: true
+        fastreport.llm.request.duration: true
+        fastreport.database.write.duration: true
+      slo:
+        http.server.requests:
+          - 100ms
+          - 300ms
+          - 500ms
+          - 1s
+          - 2s
+          - 5s
+        fastreport.report.end_to_end.duration:
+          - 5s
+          - 15s
+          - 30s
+          - 60s
+          - 120s
+          - 300s
+        fastreport.llm.request.duration:
+          - 1s
+          - 5s
+          - 10s
+          - 20s
+          - 30s
+          - 60s
+        fastreport.database.write.duration:
+          - 50ms
+          - 100ms
+          - 250ms
+          - 500ms
+          - 1s
+  prometheus:
+    metrics:
+      export:
+        enabled: true
