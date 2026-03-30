@@ -8,6 +8,8 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -186,6 +188,15 @@ public class ReportRepository {
                 "failed",
                 reportId
         );
+    }
+
+    public Instant findCreatedAt(Long reportId) {
+        Timestamp createdAt = db.queryForObject(
+                "SELECT created_at FROM reports WHERE id = ?",
+                Timestamp.class,
+                reportId
+        );
+        return createdAt == null ? null : createdAt.toInstant();
     }
 
     public boolean existsSameCustomerServiceSameDay(String customerId, String serviceCode) {
