@@ -42,30 +42,14 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: fastreport
       SPRING_RABBITMQ_PASSWORD: fastreport123
-      LLM_PROVIDER: ${LLM_PROVIDER:-openai-compatible}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      LLM_MOCK_FAILURE_RATE: ${LLM_MOCK_FAILURE_RATE:-0.08}
-      LLM_MOCK_MIN_LATENCY_MS: ${LLM_MOCK_MIN_LATENCY_MS:-20}
-      LLM_MOCK_MAX_LATENCY_MS: ${LLM_MOCK_MAX_LATENCY_MS:-80}
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./ops/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-    depends_on:
-      - backend
 
   frontend:
     build: ./frontend
@@ -76,21 +60,5 @@ services:
     depends_on:
       - backend
 
-  grafana:
-    image: grafana/grafana:11.1.4
-    ports:
-      - "${GRAFANA_PORT:-3001}:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-fastreport123}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - prometheus
-
 volumes:
   pgdata:
-  grafana_data:

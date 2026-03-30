@@ -11,6 +11,13 @@ The current stack uses:
 - `Server-Sent Events (SSE)` for real-time report status updates
 - A pluggable LLM provider layer for report generation
 
+## Branches
+
+| Branch | Description |
+|---|---|
+| `master` | Stable release branch |
+| `v0.5` | Current development branch |
+
 ## Overview
 
 Current flow:
@@ -81,9 +88,12 @@ Current flow:
 ### Report Workspace
 
 - Page: `/`
-- Responsive English-language workspace for report operations
+- Presents a responsive English-language workspace for report operations
+- Separates report creation, feedback, and recent report monitoring into reusable UI sections
 - Accepts customer, manager, service, spending, complaint, network-quality, and override-reason input
-- Stores the request immediately, publishes an async RabbitMQ job, and returns `202 Accepted` with `pending` status
+- Stores the request immediately
+- Publishes an async RabbitMQ job
+- Returns `202 Accepted` with `pending` status
 
 ### Validation and Duplicate Detection
 
@@ -108,7 +118,13 @@ If a warning is triggered and `overrideReason` is missing, the backend rejects t
 
 ### Unified Error Handling
 
-The backend uses a unified exception system built around `BaseAppException`, typed subclasses, and `@RestControllerAdvice` for consistent JSON error responses.
+The backend uses a unified exception system with:
+
+- `BaseAppException`
+- `ValidationError`
+- `BlockError`
+- `WarningException`
+- `@RestControllerAdvice` for consistent JSON error responses
 
 Error response format:
 
@@ -127,7 +143,11 @@ The frontend API layer parses this structure into a typed `ApiError`, so UI code
 ### Asynchronous Report Generation
 
 - Background processing is handled by a Spring Boot worker
-- Worker status transitions: `pending`, `processing`, `completed`, `failed`
+- Worker status transitions:
+  - `pending`
+  - `processing`
+  - `completed`
+  - `failed`
 - If the LLM call fails, the job is retried up to 3 times
 - On completion or final failure, the worker publishes a result event
 
@@ -175,100 +195,6 @@ Completed reports can be downloaded as:
 - TXT
 - PDF
 - CSV
-
-## Monitoring
-
-The project includes a first-pass Prometheus + Grafana monitoring stack for the backend.
-
-Instrumented areas:
-
-- Spring Boot Actuator and Micrometer via `GET /actuator/prometheus`
-- business counters for accepted reports, terminal report status, scheduled retries, LLM request success/error and latency, and SSE publish success/error
-- RabbitMQ queue depth gauges for the main queue, combined retry queues, and result queue
-- built-in JVM, HikariCP, and HTTP server metrics
-
-Services:
-
-- Prometheus: [http://localhost:9090](http://localhost:9090)
-- Grafana: [http://localhost:3001](http://localhost:3001)
-- default Grafana credentials: `admin` / `fastreport123`
-- optional overrides: `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_PORT`
-
-### Start the full stack
-
-```bash
-docker compose up -d --build
-```
-
-Then verify:
-
-```bash
-curl -s http://localhost:8080/actuator/prometheus | head
-curl -s http://localhost:9090/-/ready
-```
-
-Grafana auto-loads the `FastReport Overview` dashboard from `ops/grafana/dashboards/fastreport-overview.json`.
-
-## Realistic Seed Data
-
-For realistic test traffic, use the mock LLM provider plus the seeding script instead of inserting rows by hand.
-
-### Why this approach
-
-- requests still go through `POST /api/reports`
-- validation, inserts, RabbitMQ publishing, worker consumption, retry, and status updates all run
-- a small database backfill step is used only to shape historical timestamps and preserve some `pending` / `processing` records for UI demos
-
-### Start the backend in mock mode
-
-```bash
-LLM_PROVIDER=mock \
-LLM_MOCK_FAILURE_RATE=0.08 \
-LLM_MOCK_MIN_LATENCY_MS=20 \
-LLM_MOCK_MAX_LATENCY_MS=80 \
-docker compose up -d --build backend
-```
-
-This makes report generation fast, cheap, and predictable for local seeding.
-
-### Seed 100 reports
-
-```bash
-python3 scripts/generate_test_reports.py \
-  --count 100 \
-  --rate 10 \
-  --failed-ratio 0.10 \
-  --pending-ratio 0.05 \
-  --processing-ratio 0.05 \
-  --history-span 3d
-```
-
-### Seed 1000 reports
-
-```bash
-python3 scripts/generate_test_reports.py \
-  --count 1000 \
-  --rate 40 \
-  --failed-ratio 0.08 \
-  --pending-ratio 0.03 \
-  --processing-ratio 0.04 \
-  --history-span 14d \
-  --settle-timeout 180
-```
-
-### Useful knobs
-
-- `--rate`: request rate sent to the API
-- `--failed-ratio`: final failed share after backfill
-- `--pending-ratio`: keep some pending records visible
-- `--processing-ratio`: keep some processing records visible
-- `--history-span`: spread data across minutes / hours / days
-- `--history-ratio`: how much data should be shifted into older windows
-
-### What is real vs. backfilled
-
-- real chain: request validation, inserts into `customers` / `managers` / `reports` / child tables, RabbitMQ publishing, worker processing, retry behavior from mock LLM failures, and `completed` / `failed` terminal outcomes
-- database backfill: historical `created_at` / `updated_at` plus preserving some `pending` and `processing` rows for UI and monitoring demos
 
 ## Frontend UX
 

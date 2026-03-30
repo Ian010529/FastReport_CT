@@ -2,7 +2,6 @@ package com.ct.fastreport.messaging;
 
 import com.ct.fastreport.config.RabbitConfig;
 import com.ct.fastreport.dto.ReportJobMessage;
-import com.ct.fastreport.monitoring.MonitoringService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
@@ -12,11 +11,9 @@ public class ReportJobPublisher {
     private static final int MAX_RETRIES = 3;
 
     private final RabbitTemplate rabbitTemplate;
-    private final MonitoringService monitoringService;
 
-    public ReportJobPublisher(RabbitTemplate rabbitTemplate, MonitoringService monitoringService) {
+    public ReportJobPublisher(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
-        this.monitoringService = monitoringService;
     }
 
     public void publishNewReport(Long reportId) {
@@ -38,7 +35,6 @@ public class ReportJobPublisher {
                 retryRoutingKey(nextRetryCount),
                 new ReportJobMessage(failedMessage.getReportId(), nextRetryCount)
         );
-        monitoringService.recordRetryScheduled();
         return true;
     }
 

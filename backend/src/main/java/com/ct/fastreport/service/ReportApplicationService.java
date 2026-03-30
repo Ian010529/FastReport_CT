@@ -6,7 +6,6 @@ import com.ct.fastreport.exception.BlockError;
 import com.ct.fastreport.exception.ValidationError;
 import com.ct.fastreport.exception.WarningException;
 import com.ct.fastreport.messaging.ReportJobPublisher;
-import com.ct.fastreport.monitoring.MonitoringService;
 import com.ct.fastreport.model.InternalReportRequest;
 import com.ct.fastreport.repository.CustomerRepository;
 import com.ct.fastreport.repository.ManagerRepository;
@@ -46,7 +45,6 @@ public class ReportApplicationService {
     private final ReportSseService reportSseService;
     private final ReportExportService reportExportService;
     private final ReportRequestMapper reportRequestMapper;
-    private final MonitoringService monitoringService;
 
     public ReportApplicationService(ReportRepository reportRepository,
                                     CustomerRepository customerRepository,
@@ -54,8 +52,7 @@ public class ReportApplicationService {
                                     ReportJobPublisher reportJobPublisher,
                                     ReportSseService reportSseService,
                                     ReportExportService reportExportService,
-                                    ReportRequestMapper reportRequestMapper,
-                                    MonitoringService monitoringService) {
+                                    ReportRequestMapper reportRequestMapper) {
         this.reportRepository = reportRepository;
         this.customerRepository = customerRepository;
         this.managerRepository = managerRepository;
@@ -63,7 +60,6 @@ public class ReportApplicationService {
         this.reportSseService = reportSseService;
         this.reportExportService = reportExportService;
         this.reportRequestMapper = reportRequestMapper;
-        this.monitoringService = monitoringService;
     }
 
     @Transactional
@@ -94,7 +90,6 @@ public class ReportApplicationService {
 
         reportJobPublisher.publishNewReport(id);
         log.info("Published RabbitMQ job for report id={}", id);
-        monitoringService.recordReportCreated();
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", id);

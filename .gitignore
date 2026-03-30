@@ -7,5 +7,3 @@ target/
 pgdata/
 .idea/
 *.iml
-__pycache__/
-*.pyc

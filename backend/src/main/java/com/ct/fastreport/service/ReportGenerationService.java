@@ -1,17 +1,12 @@
 package com.ct.fastreport.service;
 
 import com.ct.fastreport.dto.ReportResponse;
-import com.ct.fastreport.monitoring.MonitoringService;
 import com.ct.fastreport.repository.ReportRepository;
 import com.ct.fastreport.service.llm.LLMGenerationRequest;
-import com.ct.fastreport.service.llm.LLMService;
 import com.ct.fastreport.service.llm.LLMServiceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import java.time.Duration;
-import java.time.Instant;
 
 @Service
 public class ReportGenerationService {
@@ -20,14 +15,11 @@ public class ReportGenerationService {
 
     private final ReportRepository reportRepository;
     private final LLMServiceFactory llmServiceFactory;
-    private final MonitoringService monitoringService;
 
     public ReportGenerationService(ReportRepository reportRepository,
-                                   LLMServiceFactory llmServiceFactory,
-                                   MonitoringService monitoringService) {
+                                   LLMServiceFactory llmServiceFactory) {
         this.reportRepository = reportRepository;
         this.llmServiceFactory = llmServiceFactory;
-        this.monitoringService = monitoringService;
     }
 
     public String generateCarePlan(Long reportId) throws Exception {
@@ -43,48 +35,36 @@ public class ReportGenerationService {
         }
 
         reportRepository.markCompleted(reportId, content);
-        monitoringService.recordReportTerminalStatus("completed", endToEndDuration(reportId));
         return content;
     }
 
     public void markFailed(Long reportId) {
         reportRepository.markFailed(reportId);
-        monitoringService.recordReportTerminalStatus("failed", endToEndDuration(reportId));
     }
 
     private String callLLM(ReportResponse report) throws Exception {
         String prompt = buildPrompt(report);
         log.debug("Report prompt length={} for report {}", prompt.length(), report.id);
-        LLMService llmService = llmServiceFactory.getService();
-        String provider = llmService.provider();
-        Instant start = Instant.now();
-        try {
-            String content = llmService.generate(new LLMGenerationRequest(
-                    "You are a telecom reporting specialist for China Telecom. " +
-                            "Generate a professional telecom customer report in English using clean, structured markdown. " +
-                            "The output must be easy to scan, operationally useful, and suitable for a business user rather than an engineer. " +
-                            "Do not write in Chinese. Do not add preambles or closing remarks. " +
-                            "Use this exact structure and exact heading names: " +
-                            "# Report Summary " +
-                            "## Executive Summary " +
-                            "## Customer Profile " +
-                            "## Service Assessment " +
-                            "## Risk Signals " +
-                            "## Recommended Actions " +
-                            "## Follow-Up Plan. " +
-                            "Each section must contain short, concrete bullet points. " +
-                            "Recommended Actions must be a numbered list. " +
-                            "Follow-Up Plan must include Owner, Timeline, and Success Measure as bullets.",
-                    prompt,
-                    0.4,
-                    2000
-            ));
-            monitoringService.recordLlmCall(provider, true, Duration.between(start, Instant.now()));
-            return content;
-        } catch (Exception ex) {
-            monitoringService.recordLlmCall(provider, false, Duration.between(start, Instant.now()));
-            throw ex;
-        }
+        return llmServiceFactory.getService().generate(new LLMGenerationRequest(
+                "You are a telecom reporting specialist for China Telecom. " +
+                        "Generate a professional telecom customer report in English using clean, structured markdown. " +
+                        "The output must be easy to scan, operationally useful, and suitable for a business user rather than an engineer. " +
+                        "Do not write in Chinese. Do not add preambles or closing remarks. " +
+                        "Use this exact structure and exact heading names: " +
+                        "# Report Summary " +
+                        "## Executive Summary " +
+                        "## Customer Profile " +
+                        "## Service Assessment " +
+                        "## Risk Signals " +
+                        "## Recommended Actions " +
+                        "## Follow-Up Plan. " +
+                        "Each section must contain short, concrete bullet points. " +
+                        "Recommended Actions must be a numbered list. " +
+                        "Follow-Up Plan must include Owner, Timeline, and Success Measure as bullets.",
+                prompt,
+                0.4,
+                2000
+        ));
     }
 
     private String buildPrompt(ReportResponse report) {
@@ -118,13 +98,5 @@ public class ReportGenerationService {
         sb.append("- Avoid generic filler, marketing language, or internal system terminology.\n");
         sb.append("- Do not mention care plans; this is a report.\n");
         return sb.toString();
-    }
-
-    private Duration endToEndDuration(Long reportId) {
-        Instant createdAt = reportRepository.findCreatedAt(reportId);
-        if (createdAt == null) {
-            return Duration.ZERO;
-        }
-        return Duration.between(createdAt, Instant.now());
     }
 }
