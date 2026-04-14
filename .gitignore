@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.aws-sam/
 target/
 *.class
 *.jar

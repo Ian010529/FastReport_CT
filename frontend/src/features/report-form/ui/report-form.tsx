@@ -27,7 +27,7 @@ interface ReportFormProps {
   onChange: (
     field: keyof ReportFormValues,
   ) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onRefresh: () => Promise<void>;
+  onRefresh?: () => Promise<void>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }
 
@@ -47,26 +47,28 @@ export function ReportForm({
       : inputClassName;
 
   return (
-    <SectionCard className="h-full">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <SectionCard className="h-full rounded-[28px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(248,250,252,0.95)_100%)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Create
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">
+            New Request
           </p>
           <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Create Report
+            Report intake form
           </h3>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-            Submit a new report request, review validation guidance, and confirm warning cases when needed.
+            Capture customer context, assign ownership, and submit the request into the report generation queue.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void onRefresh()}
-          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
-        >
-          Refresh Reports
-        </button>
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={() => void onRefresh()}
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
+          >
+            Refresh Reports
+          </button>
+        ) : null}
       </div>
 
       {liveMessage && (
@@ -85,7 +87,7 @@ export function ReportForm({
       )}
       <form onSubmit={onSubmit} className="mt-6 space-y-8">
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:p-5">
+          <section className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
             <h4 className={sectionTitleClassName}>Customer Information</h4>
             <p className={sectionDescriptionClassName}>
               Identify the customer and validate their report ownership details.
@@ -121,7 +123,7 @@ export function ReportForm({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:p-5">
+          <section className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
             <h4 className={sectionTitleClassName}>Manager Information</h4>
             <p className={sectionDescriptionClassName}>
               Assign accountability and make sure report ownership is consistent.
@@ -149,7 +151,7 @@ export function ReportForm({
           </section>
         </div>
 
-        <section className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 sm:p-5">
+        <section className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
           <h4 className={sectionTitleClassName}>Report Details</h4>
           <p className={sectionDescriptionClassName}>
             Describe the report context, service profile, and quality signals used for generation.
@@ -232,17 +234,19 @@ export function ReportForm({
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center justify-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#1d4ed8_0%,#2563eb_100%)] px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_28px_rgba(37,99,235,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Submitting..." : "Submit Report"}
           </button>
-          <button
-            type="button"
-            onClick={() => void onRefresh()}
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            Refresh List
-          </button>
+          {onRefresh ? (
+            <button
+              type="button"
+              onClick={() => void onRefresh()}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Refresh List
+            </button>
+          ) : null}
         </div>
       </form>
     </SectionCard>

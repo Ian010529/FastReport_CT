@@ -15,6 +15,13 @@ export interface ReportDetail extends ReportSummary {
   reportContent: string | null;
 }
 
+export interface ReportPage {
+  items: ReportSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface ReportFormValues {
   customerId: string;
   customerName: string;

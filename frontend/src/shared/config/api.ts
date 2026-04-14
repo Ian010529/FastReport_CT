@@ -1,2 +1,6 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
+export const APP_RUNTIME = process.env.NEXT_PUBLIC_RUNTIME || "local";
+
+export const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || "";

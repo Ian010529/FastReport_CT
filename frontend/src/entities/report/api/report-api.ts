@@ -4,6 +4,7 @@ import type {
   CreateReportPayload,
   CreateReportResponse,
   ReportDetail,
+  ReportPage,
   ReportSummary,
 } from "@/entities/report/model/types";
 
@@ -23,8 +24,25 @@ export class ApiError extends Error {
   }
 }
 
-export async function getReports(): Promise<ReportSummary[]> {
-  const response = await fetch(`${API_BASE_URL}/api/reports`);
+interface ReportListParams {
+  search?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getReports(params: ReportListParams = {}): Promise<ReportSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/api/reports${toQueryString(params)}`);
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return response.json();
+}
+
+export async function getReportPage(params: ReportListParams = {}): Promise<ReportPage> {
+  const response = await fetch(`${API_BASE_URL}/api/reports/page${toQueryString(params)}`);
 
   if (!response.ok) {
     throw await toApiError(response);
@@ -90,4 +108,16 @@ async function toApiError(response: Response): Promise<ApiError> {
     detail: {},
     httpStatus: response.status,
   });
+}
+
+function toQueryString(params: ReportListParams): string {
+  const query = new URLSearchParams();
+
+  if (params.search) query.set("search", params.search);
+  if (params.status) query.set("status", params.status);
+  if (params.limit != null) query.set("limit", String(params.limit));
+  if (params.offset != null) query.set("offset", String(params.offset));
+
+  const resolved = query.toString();
+  return resolved ? `?${resolved}` : "";
 }

@@ -54,3 +54,19 @@ CREATE TABLE IF NOT EXISTS network_quality (
     metric          VARCHAR(50) NOT NULL,
     value           TEXT NOT NULL
 );
+
+-- API Gateway WebSocket subscriptions for AWS runtime
+CREATE TABLE IF NOT EXISTS report_ws_subscriptions (
+    id              BIGSERIAL PRIMARY KEY,
+    report_id       BIGINT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+    connection_id   VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at      TIMESTAMP NOT NULL,
+    UNIQUE (report_id, connection_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_ws_subscriptions_report_id
+    ON report_ws_subscriptions(report_id);
+
+CREATE INDEX IF NOT EXISTS idx_report_ws_subscriptions_connection_id
+    ON report_ws_subscriptions(connection_id);

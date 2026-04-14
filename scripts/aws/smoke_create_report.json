@@ -1,0 +1,17 @@
+{
+  "customerId": "40000001",
+  "customerName": "AWS Smoke Test",
+  "nationalId": "110101199003077758",
+  "managerName": "Manager Li",
+  "managerId": "200001",
+  "serviceCode": "FTTH_500M",
+  "currentPlan": "Integrated Plan 199",
+  "additionalServices": ["Cloud Disk", "IPTV"],
+  "spendingLast6": [199, 199, 210, 185, 199, 220],
+  "complaintHistory": [
+    "2024-12 Slow broadband speed",
+    "2025-01 Slow customer service response"
+  ],
+  "networkQuality": "Download speed occasionally drops below 50% of subscribed bandwidth",
+  "overrideReason": "AWS deployment smoke test"
+}
