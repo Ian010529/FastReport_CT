@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { ReportSummary } from "@/entities/report/model/types";
 import { SectionCard } from "@/shared/ui/section-card";
@@ -7,25 +8,45 @@ import { StatusBadge } from "@/shared/ui/status-badge";
 interface ReportListProps {
   fetched: boolean;
   reports: ReportSummary[];
+  title?: string;
+  subtitle?: string;
+  eyebrow?: string;
+  countLabel?: string;
+  headerAction?: ReactNode;
+  footer?: ReactNode;
+  emptyMessage?: string;
 }
 
-export function ReportList({ fetched, reports }: ReportListProps) {
+export function ReportList({
+  fetched,
+  reports,
+  title = "Recent Reports",
+  subtitle = "Review recent submissions, track processing state, and open completed reports.",
+  eyebrow = "Monitor",
+  countLabel,
+  headerAction,
+  footer,
+  emptyMessage = "No reports yet. Your newly submitted reports will appear here.",
+}: ReportListProps) {
   return (
-    <SectionCard className="h-full">
-      <div className="flex items-start justify-between gap-4">
+    <SectionCard className="h-full rounded-[28px] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.96)_100%)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Monitor
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600">
+            {eyebrow}
           </p>
           <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Recent Reports
+            {title}
           </h3>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Review recent submissions, track processing state, and open completed reports.
+            {subtitle}
           </p>
         </div>
-        <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-          {reports.length} items
+        <div className="flex flex-wrap items-center gap-3">
+          {headerAction}
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+            {countLabel ?? `${reports.length} items`}
+          </div>
         </div>
       </div>
 
@@ -36,91 +57,47 @@ export function ReportList({ fetched, reports }: ReportListProps) {
         </div>
       ) : reports.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-          No reports yet. Your newly submitted reports will appear here.
+          {emptyMessage}
         </div>
       ) : (
         <>
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 lg:block">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Report</th>
-                  <th className="px-4 py-3 text-left font-medium">Customer</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                  <th className="px-4 py-3 text-left font-medium">Created</th>
-                  <th className="px-4 py-3 text-left font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {reports.map((report) => (
-                  <tr key={report.id} className="align-top">
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-slate-900">#{report.id}</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Report record
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-slate-900">
-                        {report.customerName}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Customer ID {report.customerId}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <StatusBadge status={report.status} />
-                    </td>
-                    <td className="px-4 py-4 text-slate-600">{report.createdAt}</td>
-                    <td className="px-4 py-4">
-                      {report.status === "completed" ? (
-                        <Link
-                          href={`/report/${report.id}`}
-                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
-                        >
-                          Open Report
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-slate-400">Unavailable</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid gap-3 lg:hidden">
+          <div className="grid gap-4">
             {reports.map((report) => (
               <article
                 key={report.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-[0_16px_30px_rgba(15,23,42,0.06)] sm:p-5"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Report #{report.id}
+                    </div>
+                    <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
                       {report.customerName}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      Report #{report.id} · Customer ID {report.customerId}
+                    <div className="mt-1 text-sm text-slate-500">
+                      Customer ID {report.customerId}
                     </div>
                   </div>
-                  <StatusBadge status={report.status} />
-                </div>
-                <div className="mt-4 text-xs text-slate-500">
-                  Created {report.createdAt}
-                </div>
-                <div className="mt-4">
-                  {report.status === "completed" ? (
-                    <Link
-                      href={`/report/${report.id}`}
-                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      Open Report
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-slate-400">Report not ready yet</span>
-                  )}
+
+                  <div className="grid flex-1 gap-4 sm:grid-cols-3 xl:max-w-2xl">
+                    <RecordMeta label="Created" value={report.createdAt} />
+                    <RecordMeta label="Status">
+                      <StatusBadge status={report.status} />
+                    </RecordMeta>
+                    <RecordMeta label="Action">
+                      {report.status === "completed" ? (
+                        <Link
+                          href={`/report/${report.id}`}
+                          className="inline-flex items-center rounded-full bg-[linear-gradient(135deg,#1d4ed8_0%,#2563eb_100%)] px-4 py-2 text-xs font-semibold text-white shadow-[0_12px_24px_rgba(37,99,235,0.24)] transition hover:brightness-105"
+                        >
+                          Open report
+                        </Link>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-500">Waiting for completion</span>
+                      )}
+                    </RecordMeta>
+                  </div>
                 </div>
               </article>
             ))}
@@ -128,6 +105,28 @@ export function ReportList({ fetched, reports }: ReportListProps) {
         </>
       )}
       </div>
+      {footer ? <div className="mt-6 border-t border-slate-200/80 pt-4">{footer}</div> : null}
     </SectionCard>
+  );
+}
+
+function RecordMeta({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[20px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-medium text-slate-700">
+        {children ?? value}
+      </div>
+    </div>
   );
 }

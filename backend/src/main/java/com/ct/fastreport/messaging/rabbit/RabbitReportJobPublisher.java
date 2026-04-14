@@ -1,24 +1,28 @@
-package com.ct.fastreport.messaging;
+package com.ct.fastreport.messaging.rabbit;
 
+import com.ct.fastreport.application.port.ReportJobPublisher;
 import com.ct.fastreport.config.RabbitConfig;
 import com.ct.fastreport.dto.ReportJobMessage;
 import com.ct.fastreport.monitoring.MonitoringService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ReportJobPublisher {
+@Profile("local")
+public class RabbitReportJobPublisher implements ReportJobPublisher {
 
     private static final int MAX_RETRIES = 3;
 
     private final RabbitTemplate rabbitTemplate;
     private final MonitoringService monitoringService;
 
-    public ReportJobPublisher(RabbitTemplate rabbitTemplate, MonitoringService monitoringService) {
+    public RabbitReportJobPublisher(RabbitTemplate rabbitTemplate, MonitoringService monitoringService) {
         this.rabbitTemplate = rabbitTemplate;
         this.monitoringService = monitoringService;
     }
 
+    @Override
     public void publishNewReport(Long reportId) {
         rabbitTemplate.convertAndSend(
                 RabbitConfig.EXCHANGE,

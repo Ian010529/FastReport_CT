@@ -1,6 +1,7 @@
 package com.ct.fastreport.controller;
 
 import com.ct.fastreport.dto.ReportRequest;
+import com.ct.fastreport.dto.ReportPageResponse;
 import com.ct.fastreport.dto.ReportResponse;
 import com.ct.fastreport.service.ReportApplicationService;
 import org.springframework.http.MediaType;
@@ -33,8 +34,19 @@ public class ReportController {
     }
 
     @GetMapping
-    public List<ReportResponse> list(@RequestParam(required = false) String search) {
-        return reportApplicationService.list(search);
+    public List<ReportResponse> list(@RequestParam(required = false) String search,
+                                     @RequestParam(required = false) String status,
+                                     @RequestParam(required = false) Integer limit,
+                                     @RequestParam(required = false) Integer offset) {
+        return reportApplicationService.list(search, status, limit, offset);
+    }
+
+    @GetMapping("/page")
+    public ReportPageResponse page(@RequestParam(required = false) String search,
+                                   @RequestParam(required = false) String status,
+                                   @RequestParam(defaultValue = "20") Integer limit,
+                                   @RequestParam(defaultValue = "0") Integer offset) {
+        return reportApplicationService.page(search, status, limit, offset);
     }
 
     @GetMapping("/{id}")

@@ -12,6 +12,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -46,7 +47,7 @@ public class ReportRepository {
         return Objects.requireNonNull(keyHolder.getKey(), "insert report id missing").longValue();
     }
 
-    public List<ReportResponse> findAll(String search) {
+    public List<ReportResponse> findAll(String search, List<String> statuses, int limit, int offset) {
         String baseSql = "SELECT " +
                 "r.id, " +
                 "c.customer_id AS customer_id, " +
@@ -70,18 +71,28 @@ public class ReportRepository {
                 "JOIN customers c ON r.customer_id = c.id " +
                 "JOIN managers m ON r.manager_id = m.id ";
 
-        if (search != null && !search.isBlank()) {
-            String like = "%" + search.trim() + "%";
-            return db.query(
-                    baseSql +
-                            "WHERE c.customer_id ILIKE ? OR c.customer_name ILIKE ? OR m.manager_name ILIKE ? " +
-                            "OR r.service_code ILIKE ? OR r.current_plan ILIKE ? OR m.manager_id ILIKE ? " +
-                            "ORDER BY r.created_at DESC",
-                    (rs, i) -> mapRow(rs),
-                    like, like, like, like, like, like
-            );
-        }
-        return db.query(baseSql + "ORDER BY r.created_at DESC", (rs, i) -> mapRow(rs));
+        QueryParts queryParts = buildFilters(search, statuses);
+        List<Object> params = new ArrayList<>(queryParts.params());
+        params.add(limit);
+        params.add(offset);
+        return db.query(
+                baseSql + queryParts.whereClause() + " ORDER BY r.created_at DESC LIMIT ? OFFSET ?",
+                (rs, i) -> mapRow(rs),
+                params.toArray()
+        );
+    }
+
+    public int countAll(String search, List<String> statuses) {
+        String sql = "SELECT COUNT(*) FROM reports r " +
+                "JOIN customers c ON r.customer_id = c.id " +
+                "JOIN managers m ON r.manager_id = m.id ";
+        QueryParts queryParts = buildFilters(search, statuses);
+        Integer count = db.queryForObject(
+                sql + queryParts.whereClause(),
+                Integer.class,
+                queryParts.params().toArray()
+        );
+        return count == null ? 0 : count;
     }
 
     public ReportResponse findById(Long id) {
@@ -258,5 +269,37 @@ public class ReportRepository {
         report.createdAt = rs.getTimestamp("created_at").toString();
         report.updatedAt = rs.getTimestamp("updated_at").toString();
         return report;
+    }
+
+    private QueryParts buildFilters(String search, List<String> statuses) {
+        List<String> clauses = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+
+        if (search != null && !search.isBlank()) {
+            String like = "%" + search.trim() + "%";
+            clauses.add(
+                    "(c.customer_id ILIKE ? OR c.customer_name ILIKE ? OR m.manager_name ILIKE ? " +
+                            "OR r.service_code ILIKE ? OR r.current_plan ILIKE ? OR m.manager_id ILIKE ?)"
+            );
+            params.add(like);
+            params.add(like);
+            params.add(like);
+            params.add(like);
+            params.add(like);
+            params.add(like);
+        }
+
+        if (statuses != null && !statuses.isEmpty()) {
+            clauses.add("r.status IN (" + String.join(",", java.util.Collections.nCopies(statuses.size(), "?")) + ")");
+            params.addAll(statuses);
+        }
+
+        if (clauses.isEmpty()) {
+            return new QueryParts("", params);
+        }
+        return new QueryParts(" WHERE " + String.join(" AND ", clauses), params);
+    }
+
+    private record QueryParts(String whereClause, List<Object> params) {
     }
 }

@@ -1,11 +1,12 @@
 package com.ct.fastreport.service;
 
+import com.ct.fastreport.application.port.ReportJobPublisher;
 import com.ct.fastreport.dto.ReportRequest;
+import com.ct.fastreport.dto.ReportPageResponse;
 import com.ct.fastreport.dto.ReportResponse;
 import com.ct.fastreport.exception.BlockError;
 import com.ct.fastreport.exception.ValidationError;
 import com.ct.fastreport.exception.WarningException;
-import com.ct.fastreport.messaging.ReportJobPublisher;
 import com.ct.fastreport.monitoring.MonitoringService;
 import com.ct.fastreport.model.InternalReportRequest;
 import com.ct.fastreport.repository.CustomerRepository;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class ReportApplicationService {
@@ -93,7 +95,7 @@ public class ReportApplicationService {
         reportRepository.insertNetworkQuality(id, internalRequest.networkQuality());
 
         reportJobPublisher.publishNewReport(id);
-        log.info("Published RabbitMQ job for report id={}", id);
+        log.info("Published report generation job for report id={}", id);
         monitoringService.recordReportCreated();
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -107,8 +109,23 @@ public class ReportApplicationService {
         return body;
     }
 
-    public List<ReportResponse> list(String search) {
-        return reportRepository.findAll(search);
+    public List<ReportResponse> list(String search, String status, Integer limit, Integer offset) {
+        int safeLimit = clampLimit(limit == null ? 100 : limit);
+        int safeOffset = Math.max(0, offset == null ? 0 : offset);
+        return reportRepository.findAll(search, parseStatuses(status), safeLimit, safeOffset);
+    }
+
+    public ReportPageResponse page(String search, String status, Integer limit, Integer offset) {
+        int safeLimit = clampLimit(limit);
+        int safeOffset = Math.max(0, offset == null ? 0 : offset);
+        List<String> statuses = parseStatuses(status);
+
+        ReportPageResponse response = new ReportPageResponse();
+        response.items = reportRepository.findAll(search, statuses, safeLimit, safeOffset);
+        response.total = reportRepository.countAll(search, statuses);
+        response.limit = safeLimit;
+        response.offset = safeOffset;
+        return response;
     }
 
     public ResponseEntity<ReportResponse> get(Long id) {
@@ -225,5 +242,26 @@ public class ReportApplicationService {
     }
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private List<String> parseStatuses(String raw) {
+        if (isBlank(raw)) {
+            return List.of();
+        }
+
+        return java.util.Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(value -> value.toLowerCase(java.util.Locale.ROOT))
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private int clampLimit(Integer limit) {
+        int resolved = limit == null ? 20 : limit;
+        if (resolved < 1) {
+            return 20;
+        }
+        return Math.min(resolved, 100);
     }
 }

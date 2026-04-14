@@ -1,14 +1,9 @@
 package com.ct.fastreport.monitoring;
 
-import com.ct.fastreport.config.RabbitConfig;
-import com.rabbitmq.client.AMQP;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import org.springframework.amqp.AmqpException;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -18,36 +13,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MonitoringService {
 
     private final MeterRegistry meterRegistry;
-    private final RabbitTemplate rabbitTemplate;
     private final Counter reportsCreatedCounter;
     private final Counter retriesScheduledCounter;
-    private final Counter queueProbeFailureCounter;
-    private final AtomicInteger mainQueueDepth = new AtomicInteger();
-    private final AtomicInteger retryQueueDepth = new AtomicInteger();
-    private final AtomicInteger resultQueueDepth = new AtomicInteger();
     private final AtomicInteger activeSseSubscriptions = new AtomicInteger();
 
-    public MonitoringService(MeterRegistry meterRegistry, RabbitTemplate rabbitTemplate) {
+    public MonitoringService(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
-        this.rabbitTemplate = rabbitTemplate;
         this.reportsCreatedCounter = Counter.builder("fastreport_reports_created_total")
                 .description("Number of reports accepted for background generation")
                 .register(meterRegistry);
         this.retriesScheduledCounter = Counter.builder("fastreport_report_retries_total")
                 .description("Number of report retries scheduled")
-                .register(meterRegistry);
-        this.queueProbeFailureCounter = Counter.builder("fastreport_rabbitmq_queue_probe_failures_total")
-                .description("Number of RabbitMQ queue depth probe failures")
-                .register(meterRegistry);
-
-        Gauge.builder("fastreport_rabbitmq_main_queue_depth", mainQueueDepth, AtomicInteger::get)
-                .description("Current message depth for the main report generation queue")
-                .register(meterRegistry);
-        Gauge.builder("fastreport_rabbitmq_retry_queue_depth", retryQueueDepth, AtomicInteger::get)
-                .description("Current combined message depth for retry queues")
-                .register(meterRegistry);
-        Gauge.builder("fastreport_rabbitmq_result_queue_depth", resultQueueDepth, AtomicInteger::get)
-                .description("Current message depth for the report result queue")
                 .register(meterRegistry);
         Gauge.builder("fastreport_sse_active_subscriptions", activeSseSubscriptions, AtomicInteger::get)
                 .description("Current number of active SSE subscriptions")
@@ -90,27 +66,5 @@ public class MonitoringService {
 
     public void setActiveSseSubscriptions(int count) {
         activeSseSubscriptions.set(count);
-    }
-
-    @Scheduled(fixedDelay = 10000L, initialDelay = 5000L)
-    public void refreshQueueDepthMetrics() {
-        try {
-            mainQueueDepth.set(queueDepth(RabbitConfig.MAIN_QUEUE));
-            retryQueueDepth.set(
-                    queueDepth(RabbitConfig.RETRY_QUEUE_1)
-                            + queueDepth(RabbitConfig.RETRY_QUEUE_2)
-                            + queueDepth(RabbitConfig.RETRY_QUEUE_3)
-            );
-            resultQueueDepth.set(queueDepth(RabbitConfig.RESULT_QUEUE));
-        } catch (AmqpException ex) {
-            queueProbeFailureCounter.increment();
-        }
-    }
-
-    private int queueDepth(String queueName) {
-        return rabbitTemplate.execute(channel -> {
-            AMQP.Queue.DeclareOk ok = channel.queueDeclarePassive(queueName);
-            return ok.getMessageCount();
-        });
     }
 }

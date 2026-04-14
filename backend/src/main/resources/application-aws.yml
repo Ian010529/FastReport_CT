@@ -1,0 +1,26 @@
+fastreport:
+  runtime: aws
+
+aws:
+  region: ${AWS_REGION:eu-west-2}
+  sqs:
+    report-jobs-queue-url: ${REPORT_JOBS_QUEUE_URL:}
+    max-receive-count: ${REPORT_JOBS_MAX_RECEIVE_COUNT:5}
+  websocket:
+    management-endpoint: ${WEBSOCKET_API_ENDPOINT:}
+    subscription-ttl-hours: ${WEBSOCKET_SUBSCRIPTION_TTL_HOURS:2}
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:2}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:0}
+      idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:10000}
+      max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:300000}
+
+management:
+  health:
+    diskspace:
+      enabled: false
+    rabbit:
+      enabled: false

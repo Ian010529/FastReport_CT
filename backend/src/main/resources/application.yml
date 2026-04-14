@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  profiles:
+    default: local
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fastreport}
     username: ${SPRING_DATASOURCE_USERNAME:fastreport}
@@ -14,6 +16,10 @@ spring:
     password: ${SPRING_RABBITMQ_PASSWORD:guest}
   jackson:
     default-property-inclusion: non_null
+
+fastreport:
+  cors:
+    allowed-origins: ${FASTREPORT_ALLOWED_ORIGINS:http://localhost:3000}
 
 openai:
   api-key: ${OPENAI_API_KEY:}

@@ -38,6 +38,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fastreport
       SPRING_DATASOURCE_USERNAME: fastreport
       SPRING_DATASOURCE_PASSWORD: fastreport123
+      SPRING_PROFILES_ACTIVE: local
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: fastreport
